@@ -125,23 +125,16 @@ def get_columns(table: Tag) -> list[tuple[str, float] | None] | None:
 
     return cols
 
-def best_col(cols: list[tuple[str, float] | None]) -> int | None:
+def unique_cols(cols: list[tuple[str, float] | None]) -> dict[str, int] | None:
     idxs = {}
 
     for i, col in enumerate(cols):
-        if col is None or col[0] in idxs:
+        if col is None or col[0] in idxs or col[0] not in ["g", "ml", "serving"]:
             continue
 
         idxs[col[0]] = i
 
-    if "g" in idxs:
-        return idxs["g"]
-    elif "ml" in idxs:
-        return idxs["ml"]
-    elif "serving" in idxs:
-        return idxs["serving"]
-
-    return None
+    return idxs if len(idxs) > 0 else None
 
 def parse_cell(cell: str) -> tuple[str, float] | None:
     if "trace" in cell.lower():
@@ -173,89 +166,94 @@ def parse_slash_row_head(row_head: str) -> tuple[str, float] | None:
 
 def extract_nutrition(
         cols: list[tuple[str, float] | None],
-        rows: list[tuple[str, list[str]]],
-        nutr: Nutrition) -> tuple[str, float] | None:
+        rows: list[tuple[str, list[str]]]
+    ) -> list[tuple[Nutrition, str, float]] | None:
 
-    col_idx = best_col(cols)
-    if col_idx is None:
+    best_cols = unique_cols(cols)
+    if best_cols is None:
         return None
 
-    col = cols[col_idx]
-    assert col is not None
-    unit_measure, unit_amount = col
+    results = []
 
-    if unit_amount == 0:
-        return None
+    for _, col_idx in best_cols.items():
+        col = cols[col_idx]
+        assert col is not None
+        unit_measure, unit_amount = col
 
-    if unit_measure in ["g", "ml"]:
-        unit_scale = unit_amount / 100.0
-        unit_amount = 100.0
-    else:
-        unit_scale = 1.0
+        if unit_amount == 0:
+            return None
 
-    set_any = False
+        if unit_measure in ["g", "ml"]:
+            unit_scale = unit_amount / 100.0
+            unit_amount = 100.0
+        else:
+            unit_scale = 1.0
 
-    for row_head, row in rows:
-        # Skip if row data doesn't match number of columns or row header is empty
-        if len(row) != len(cols) or len(row_head) == 0:
-            continue
+        nutr = Nutrition()
+        set_any = False
 
-        # Get cell value at the best column index
-        cell = row[col_idx]
-        cell_val = parse_cell(cell)
-        if cell_val is None:
-            continue
-
-        # Extract unit and amount from cell value
-        cell_unit, cell_amount = cell_val
-
-        # Parse the row header to get attribute name and conversion factor
-        head_parse = parse_row_head(row_head)
-        if head_parse is None:
-            # Special case - if cell unit is kcal, treat as energy
-            if cell_unit == "kcal":
-                head_parse = ("energy", 1)
-            else:
+        for row_head, row in rows:
+            # Skip if row data doesn't match number of columns or row header is empty
+            if len(row) != len(cols) or len(row_head) == 0:
                 continue
 
-        attr, attr_conv = head_parse
-        cell_amount *= attr_conv
-
-        # Handle unitless values by trying to find unit in row header
-        if cell_unit == "unitless":
-            if new_unit := find_unit_in_row_head(row_head):
-                cell_unit = new_unit[0]
-                cell_amount *= new_unit[1]
-            elif cell_amount == 0:
-                cell_unit = "g"
-            else:
+            # Get cell value at the best column index
+            cell = row[col_idx]
+            cell_val = parse_cell(cell)
+            if cell_val is None:
                 continue
 
-        # Handle slash patterns by finding the first unit in the header's
-        # corresponding slash
-        if cell_unit == "slash":
-            if new_unit := parse_slash_row_head(row_head):
-                cell_unit = new_unit[0]
-                cell_amount *= new_unit[1]
-            elif cell_amount == 0:
-                cell_unit = "g"
-            else:
-                continue
+            # Extract unit and amount from cell value
+            cell_unit, cell_amount = cell_val
 
-        assert cell_unit in ["g", "kcal"]
-        nutr.__setattr__(attr, cell_amount / unit_scale)
-        set_any = True
+            # Parse the row header to get attribute name and conversion factor
+            head_parse = parse_row_head(row_head)
+            if head_parse is None:
+                # Special case - if cell unit is kcal, treat as energy
+                if cell_unit == "kcal":
+                    head_parse = ("energy", 1)
+                else:
+                    continue
 
-    if set_any:
-        return unit_measure, unit_amount
+            attr, attr_conv = head_parse
+            cell_amount *= attr_conv
 
-def parse_html(product, html: str) -> tuple[Nutrition, str, float] | None:
+            # Handle unitless values by trying to find unit in row header
+            if cell_unit == "unitless":
+                if new_unit := find_unit_in_row_head(row_head):
+                    cell_unit = new_unit[0]
+                    cell_amount *= new_unit[1]
+                elif cell_amount == 0:
+                    cell_unit = "g"
+                else:
+                    continue
+
+            # Handle slash patterns by finding the first unit in the header's
+            # corresponding slash
+            if cell_unit == "slash":
+                if new_unit := parse_slash_row_head(row_head):
+                    cell_unit = new_unit[0]
+                    cell_amount *= new_unit[1]
+                elif cell_amount == 0:
+                    cell_unit = "g"
+                else:
+                    continue
+
+            assert cell_unit in ["g", "kcal"]
+            nutr.__setattr__(attr, cell_amount / unit_scale)
+            set_any = True
+
+        if set_any:
+            results.append((nutr, unit_measure, unit_amount))
+
+    return results if len(results) > 0 else None
+
+def parse_html(product, html: str) -> list[tuple[Nutrition, str, float]] | None:
     soup = BeautifulSoup(html, "html.parser")
 
     tables = soup.find_all("table", class_="nutritionTable")
 
-    nutr = Nutrition()
-    unit_measure, unit_amount = None, None
+    results = []
 
     for table in tables:
         assert isinstance(table, Tag)
@@ -296,17 +294,10 @@ def parse_html(product, html: str) -> tuple[Nutrition, str, float] | None:
             row_name = row_head.get_text(strip=True)
             rows.append((row_name, [ cell.get_text(strip=True) for cell in r.find_all(["td"]) ]))
 
-        n_res = extract_nutrition(cols, rows, nutr)
-        if n_res is not None:
-            new_measure, new_amount = n_res
+        if n_res := extract_nutrition(cols, rows):
+            results += n_res
 
-            if unit_measure is not None and (new_measure != unit_measure or new_amount != unit_amount):
-                return None
-            elif unit_measure is None:
-                unit_measure, unit_amount = new_measure, new_amount
-
-    if unit_measure is not None and unit_amount is not None:
-        return nutr, unit_measure, unit_amount
+    return results
 
 if __name__ == "__main__":
     engine = get_engine()
@@ -340,16 +331,18 @@ if __name__ == "__main__":
                     html = base64.b64decode(prod["details_html"]).decode("utf-8")
 
                     if res := parse_html(prod, html):
-                        nutr, measure, amount = res
+                        for nutr, measure, amount in res:
+                            session.add(nutr)
+                            session.commit()
 
-                        session.add(nutr)
-                        session.commit()
+                            assert nutr.id is not None
 
-                        assert nutr.id is not None
+                            session.add(ProductNutrition(
+                                product_id=uid,
+                                nutrition_id=nutr.id,
+                                measure=measure,
+                                amount=amount))
 
-                        session.add(ProductNutrition(
-                            product_id=uid,
-                            nutrition_id=nutr.id,
-                            measure=measure,
-                            amount=amount))
-                        session.commit()
+                            session.commit()
+
+        print(f"finished {n}")
