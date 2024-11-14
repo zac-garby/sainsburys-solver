@@ -1,10 +1,26 @@
+from typing import List, Optional
 from sqlalchemy import Engine
-from sqlmodel import Field, SQLModel, Session, create_engine, select
+from sqlalchemy.orm import selectinload
+from sqlmodel import Field, SQLModel, Session, Relationship, create_engine, select
+
+class ProductCategory(SQLModel, table=True):
+    product_id: str = Field(foreign_key="product.id", primary_key=True)
+    category_id: str = Field(foreign_key="category.id", primary_key=True)
+
+class ProductNutrition(SQLModel, table=True):
+    product_id: str = Field(foreign_key="product.id", primary_key=True)
+    nutrition_id: int = Field(foreign_key="nutrition.id", primary_key=True)
+    measure: str
+    amount: float
+
+    product: Optional["Product"] = Relationship(back_populates="nutritions")
+    nutrition: Optional["Nutrition"] = Relationship(back_populates="products")
 
 class Category(SQLModel, table=True):
     id: str = Field(primary_key=True)
     name: str
 
+    products: List["Product"] = Relationship(back_populates="categories", link_model=ProductCategory)
 
 class Product(SQLModel, table=True):
     id: str = Field(primary_key=True)
@@ -19,14 +35,13 @@ class Product(SQLModel, table=True):
     is_alcohol: bool = Field(default=False)
     brand: str | None = Field(default=None)
 
-
-class ProductCategory(SQLModel, table=True):
-    product_id: str = Field(foreign_key="product.id", primary_key=True)
-    category_id: str = Field(foreign_key="category.id", primary_key=True)
-
+    categories: List[Category] = Relationship(back_populates="products", link_model=ProductCategory)
+    nutritions: List[ProductNutrition] = Relationship(back_populates="product")
 
 class Nutrition(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
+    products: List[ProductNutrition] = Relationship(back_populates="nutrition")
+
     energy: float | None = Field(default=None)
     protein: float | None = Field(default=None)
     fat: float | None = Field(default=None)
@@ -62,13 +77,6 @@ class Nutrition(SQLModel, table=True):
     vit_b7: float | None = Field(default=None)
     vit_b9: float | None = Field(default=None)
     vit_b12: float | None = Field(default=None)
-
-
-class ProductNutrition(SQLModel, table=True):
-    product_id: str = Field(foreign_key="product.id", primary_key=True)
-    nutrition_id: int = Field(foreign_key="nutrition.id", primary_key=True)
-    measure: str
-    amount: float
 
 
 def get_engine() -> Engine:
