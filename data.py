@@ -1,0 +1,81 @@
+from sqlalchemy import Engine
+from sqlmodel import Field, SQLModel, Session, create_engine, select
+
+class Category(SQLModel, table=True):
+    id: str = Field(primary_key=True)
+    name: str
+
+
+class Product(SQLModel, table=True):
+    id: str = Field(primary_key=True)
+    name: str
+    description: str
+    image_url: str | None
+    url: str
+    unit_price: float
+    unit_measure: str
+    unit_amount: float
+    retail_price: float
+    is_alcohol: bool = Field(default=False)
+    brand: str | None = Field(default=None)
+
+
+class ProductCategory(SQLModel, table=True):
+    product_id: str = Field(foreign_key="product.id", primary_key=True)
+    category_id: str = Field(foreign_key="category.id", primary_key=True)
+
+
+class Nutrition(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    energy: float | None = Field(default=None)
+    protein: float | None = Field(default=None)
+    fat: float | None = Field(default=None)
+    sat_fat: float | None = Field(default=None)
+    cholesterol: float | None = Field(default=None)
+    carbohydrate: float | None = Field(default=None)
+    total_sugar: float | None = Field(default=None)
+    starch: float | None = Field(default=None)
+    fibre: float | None = Field(default=None)
+    sodium: float | None = Field(default=None)
+    potassium: float | None = Field(default=None)
+    calcium: float | None = Field(default=None)
+    magnesium: float | None = Field(default=None)
+    chromium: float | None = Field(default=None)
+    molybdenum: float | None = Field(default=None)
+    phosphorus: float | None = Field(default=None)
+    iron: float | None = Field(default=None)
+    copper: float | None = Field(default=None)
+    zinc: float | None = Field(default=None)
+    manganese: float | None = Field(default=None)
+    selenium: float | None = Field(default=None)
+    iodine: float | None = Field(default=None)
+    vit_a: float | None = Field(default=None)
+    vit_c: float | None = Field(default=None)
+    vit_d: float | None = Field(default=None)
+    vit_e: float | None = Field(default=None)
+    vit_k: float | None = Field(default=None)
+    vit_b1: float | None = Field(default=None)
+    vit_b2: float | None = Field(default=None)
+    vit_b3: float | None = Field(default=None)
+    vit_b5: float | None = Field(default=None)
+    vit_b6: float | None = Field(default=None)
+    vit_b7: float | None = Field(default=None)
+    vit_b9: float | None = Field(default=None)
+    vit_b12: float | None = Field(default=None)
+
+
+class ProductNutrition(SQLModel, table=True):
+    product_id: str = Field(foreign_key="product.id", primary_key=True)
+    nutrition_id: int = Field(foreign_key="nutrition.id", primary_key=True)
+    measure: str
+    amount: float
+
+
+def get_engine() -> Engine:
+    engine = create_engine("sqlite:///data/sainsbury.db")
+    SQLModel.metadata.create_all(engine)
+    return engine
+
+
+if __name__ == "__main__":
+    get_engine()
