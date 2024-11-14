@@ -125,7 +125,7 @@ def get_columns(table: Tag) -> list[tuple[str, float] | None] | None:
 
     return cols
 
-def best_col(cols: list[tuple[str, float] | None]) -> dict[str, int]:
+def best_col(cols: list[tuple[str, float] | None]) -> int:
     idxs = {}
 
     for i, col in enumerate(cols):
