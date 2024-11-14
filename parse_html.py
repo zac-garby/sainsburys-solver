@@ -125,7 +125,7 @@ def get_columns(table: Tag) -> list[tuple[str, float] | None] | None:
 
     return cols
 
-def best_col(cols: list[tuple[str, float] | None]) -> int:
+def best_col(cols: list[tuple[str, float] | None]) -> int | None:
     idxs = {}
 
     for i, col in enumerate(cols):
@@ -134,7 +134,14 @@ def best_col(cols: list[tuple[str, float] | None]) -> int:
 
         idxs[col[0]] = i
 
-    return idxs
+    if "g" in idxs:
+        return idxs["g"]
+    elif "ml" in idxs:
+        return idxs["ml"]
+    elif "serving" in idxs:
+        return idxs["serving"]
+
+    return None
 
 def parse_cell(cell: str) -> tuple[str, float] | None:
     if "trace" in cell.lower():
