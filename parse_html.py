@@ -24,9 +24,9 @@ col_kinds = [
 cell_data_formats = [
     (rf"<?\s*({float_re}){unit_skip}kcal", "kcal", 1),
     (rf"<?\s*({float_re}){unit_skip}kj", "kcal", 0.239),
-    (rf"<?\s*({float_re}){unit_skip}g", "g", 1),
-    (rf"<?\s*({float_re}){unit_skip}mg", "g", 1e-3),
     (rf"<?\s*({float_re}){unit_skip}µg", "g", 1e-6),
+    (rf"<?\s*({float_re}){unit_skip}mg", "g", 1e-3),
+    (rf"<?\s*({float_re}){unit_skip}g", "g", 1),
     (rf"^<?\s*({float_re})$", "unitless", 1),
     (rf"^({float_re})\s*/\s*{float_re}", "slash", 1),
     (rf"^({float_re})\s*\(\s*{float_re}\s*\)", "slash", 1),
@@ -300,6 +300,8 @@ def parse_html(product, html: str) -> list[tuple[Nutrition, str, float]] | None:
     return results
 
 if __name__ == "__main__":
+    input("continue? if you do, i'll drop nutrition and productnutrition tables!")
+
     engine = get_engine()
 
     SQLModel.metadata.tables["nutrition"].drop(engine)

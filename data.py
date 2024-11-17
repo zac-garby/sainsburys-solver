@@ -1,6 +1,6 @@
 from typing import List, Optional
-from sqlalchemy import Engine
-from sqlalchemy.orm import selectinload
+from sqlalchemy import Engine, Sequence
+from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import Field, SQLModel, Session, Relationship, create_engine, select
 
 class ProductCategory(SQLModel, table=True):
@@ -84,6 +84,18 @@ def get_engine() -> Engine:
     SQLModel.metadata.create_all(engine)
     return engine
 
+def get_products(
+    session: Session,
+    selinload=False
+) -> list[Product]:
+    stmt = select(Product)
 
-if __name__ == "__main__":
-    get_engine()
+    if selinload:
+        stmt = stmt.options(
+            selectinload(Product.categories), # type: ignore
+            selectinload(Product.nutritions).selectinload(ProductNutrition.nutrition) # type: ignore
+        )
+
+    prods = session.exec(stmt).all()
+    assert prods is not None
+    return list(prods) # type: ignore
