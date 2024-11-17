@@ -32,7 +32,7 @@ target = {
     "vit_b1": (1e-3, None),
     "vit_b2": (1.3e-3, None),
     "vit_b3": (16.5e-3, None),
-    "vit_b5": (0, None),
+    "vit_b5": (5e-3, None),
     "vit_b6": (1.4e-3, None),
     "vit_b7": (0, None),
     "vit_b9": (300e-6, None),
