@@ -4,29 +4,29 @@ from data import *
 
 target = {
     "protein": (110, None),
-    "fat": (40, 65),
+    "fat": (70, 85),
     "sat_fat": (None, 15),
-    "carbohydrate": (250, 290),
+    "carbohydrate": (250, 270),
     "total_sugar": (None, 20),
     "fibre": (45, None),
 
-    "sodium": (2400e-3, 3000e-3),
+    "sodium": (None, 2600e-3),
     "potassium": (3500e-3, None),
     "calcium": (1000e-3, None),
     "magnesium": (350e-3, 600e-3),
-    "chromium": (0, None),
-    "molybdenum": (0, None),
+    # "chromium": (0, None),
+    # "molybdenum": (0, None),
     "phosphorus": (550e-3, None),
     "iron": (8.7e-3, 20e-3),
     "copper": (1.4e-3, 5e-3),
     "zinc": (9.5e-3, None),
-    "manganese": (0, None),
+    # "manganese": (0e-3, None),
     "selenium": (75e-6, 150e-6),
     "iodine": (140e-6, None),
 
     "vit_a": (700e-6, None),
     "vit_c": (40e-3, None),
-    "vit_d": (10e-6, None),
+    # "vit_d": (10e-6, None),
     "vit_e": (4e-3, None),
     "vit_k": (75e-6, None),
     "vit_b1": (1e-3, None),
@@ -34,8 +34,8 @@ target = {
     "vit_b3": (16.5e-3, None),
     "vit_b5": (5e-3, None),
     "vit_b6": (1.4e-3, None),
-    "vit_b7": (0, None),
-    "vit_b9": (300e-6, None),
+    # "vit_b7": (0e-6, None),
+    "vit_b9": (400e-6, None),
     "vit_b12": (15e-6, None),
 }
 
@@ -47,6 +47,7 @@ disallowed_ids = [
     "6567540",
     "8168098",
     "7680389",
+    "7377250",
 ]
 
 disallowed_categories = [
@@ -66,9 +67,11 @@ disallowed_categories = [
     "314945",   # Meat, fish & poultry
     "497364",   # Chicken burgers, mince & meatballs
     "269776",   # Diced, minced & meatballs
-    "13260",    # Hot meat & meals
     "13259",    # Cold meat
     "13363",    # Bacon
+    "269770",   # Breasts, portions & thighs
+
+    "514859",   # All flour
 ]
 
 allowed_categories = [
@@ -139,23 +142,24 @@ class Solution:
     def print_nutrition(self):
         for k in self.target.keys():
             val = self.total_nutrients[k]
+            disp = show_g(val)
 
-            if val < 1e-3:
-                disp = f"{val * 1e+6:.2f}µg"
-            elif val < 1:
-                disp = f"{val * 1e+3:.2f}mg"
-            elif val < 500:
-                disp = f"{val:.2f}g"
-            else:
-                disp = f"{val / 1e+3:.2f}kg"
+            best = max(
+                self.recipe,
+                key=lambda p: get_nutr_val(p[0], k) * p[1] / p[0].unit_amount
+            )
+            best_val = show_g(get_nutr_val(best[0], k) * best[1] / best[0].unit_amount)
 
-            print(f" {disp:>8}  {k}")
+            print(f" {disp:>8}  {k:<16}  ** {best_val} from {best[0].name}")
 
     def print_prices(self):
         for prod, units in sorted(self.recipe, key=lambda i: i[1]):
             price = units * prod.unit_price / prod.unit_amount
             measure = prod.unit_measure
             print(f"   £{price:>5.2f}  {units:.2f} {prod.unit_measure} x {prod.name} ({prod.id})")
+            # for k in self.target.keys():
+            #     val = get_nutr_val(prod, k) * units / prod.unit_amount
+            #     print(f"     * {k}: {val}g")
 
     def print(self):
         self.print_nutrition()
@@ -164,6 +168,18 @@ class Solution:
         print(f"  ------")
         print(f"  energy:  {self.total_energy:.2f}kcal")
         print(f"  total:   £{self.total_price:.2f}")
+
+def show_g(val: float) -> str:
+    if val < 1e-3:
+        disp = f"{val * 1e+6:.2f}µg"
+    elif val < 1:
+        disp = f"{val * 1e+3:.2f}mg"
+    elif val < 500:
+        disp = f"{val:.2f}g"
+    else:
+        disp = f"{val / 1e+3:.2f}kg"
+
+    return disp
 
 @dataclass
 class Problem:

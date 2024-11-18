@@ -4,5 +4,6 @@ data/out
 *.paw
 *.html
 *.sql
+*.pt
 .DS_Store
 __pycache__

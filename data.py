@@ -8,8 +8,8 @@ class ProductCategory(SQLModel, table=True):
     category_id: str = Field(foreign_key="category.id", primary_key=True)
 
 class ProductNutrition(SQLModel, table=True):
-    product_id: str = Field(foreign_key="product.id", primary_key=True)
-    nutrition_id: int = Field(foreign_key="nutrition.id", primary_key=True)
+    product_id: str | None = Field(default=None, foreign_key="product.id", primary_key=True)
+    nutrition_id: int | None = Field(default=None, foreign_key="nutrition.id", primary_key=True)
     measure: str
     amount: float
 
