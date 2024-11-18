@@ -12,9 +12,24 @@ class ProductNutrition(SQLModel, table=True):
     nutrition_id: int | None = Field(default=None, foreign_key="nutrition.id", primary_key=True)
     measure: str
     amount: float
+    source: str = Field(default="sainsburys")
+    sureness: float = Field(default=1.0)
 
     product: Optional["Product"] = Relationship(back_populates="nutritions")
     nutrition: Optional["Nutrition"] = Relationship(back_populates="products")
+
+class ProductTaxonomy(SQLModel, table=True):
+    product_id: str = Field(foreign_key="product.id", primary_key=True)
+    taxonomy_id: str = Field(foreign_key="taxonomy.id", primary_key=True)
+
+class Taxonomy(SQLModel, table=True):
+    id: int = Field(primary_key=True)
+    parent_id: int | None = Field(default=None, foreign_key="taxonomy.id")
+    name: str
+
+    parent: Optional["Taxonomy"] = Relationship(back_populates="children", sa_relationship_kwargs={"remote_side": "Taxonomy.id"})
+    children: List["Taxonomy"] = Relationship(back_populates="parent")
+    products: List["Product"] = Relationship(back_populates="taxonomies", link_model=ProductTaxonomy)
 
 class Category(SQLModel, table=True):
     id: str = Field(primary_key=True)
@@ -36,6 +51,7 @@ class Product(SQLModel, table=True):
     brand: str | None = Field(default=None)
 
     categories: List[Category] = Relationship(back_populates="products", link_model=ProductCategory)
+    taxonomies: List[Taxonomy] = Relationship(back_populates="products", link_model=ProductTaxonomy)
     nutritions: List[ProductNutrition] = Relationship(back_populates="product")
 
 class Nutrition(SQLModel, table=True):
@@ -93,6 +109,7 @@ def get_products(
     if selinload:
         stmt = stmt.options(
             selectinload(Product.categories), # type: ignore
+            selectinload(Product.taxonomies), # type: ignore
             selectinload(Product.nutritions).selectinload(ProductNutrition.nutrition) # type: ignore
         )
 

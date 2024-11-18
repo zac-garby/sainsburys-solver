@@ -32,6 +32,7 @@ ignore_categories = [
     1045745,
     1020827,
     1044114,
+    1046171,
 ]
 
 scraped_ids: Dict[int, Path] = {}

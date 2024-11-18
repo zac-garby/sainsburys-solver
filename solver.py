@@ -3,14 +3,14 @@ from scipy.optimize import linprog
 from data import *
 
 target = {
-    "protein": (110, None),
+    "protein": (140, None),
     "fat": (70, 85),
     "sat_fat": (None, 15),
     "carbohydrate": (250, 270),
     "total_sugar": (None, 20),
     "fibre": (45, None),
-
     "sodium": (None, 2600e-3),
+
     "potassium": (3500e-3, None),
     "calcium": (1000e-3, None),
     "magnesium": (350e-3, 600e-3),
@@ -51,7 +51,7 @@ disallowed_ids = [
 ]
 
 disallowed_categories = [
-    "461894",   # Vits and supplements
+    "411852",   # Vits and supplements
     "314371",   # All ham, cooked meats & pâté
     "474595",   # Meat & fish essentials
     "500860",   # Better for you meat & fish
@@ -70,8 +70,8 @@ disallowed_categories = [
     "13259",    # Cold meat
     "13363",    # Bacon
     "269770",   # Breasts, portions & thighs
-
-    "514859",   # All flour
+    "310866",   # Whole birds
+    "310864",   # All chicken
 ]
 
 allowed_categories = [
@@ -150,7 +150,7 @@ class Solution:
             )
             best_val = show_g(get_nutr_val(best[0], k) * best[1] / best[0].unit_amount)
 
-            print(f" {disp:>8}  {k:<16}  ** {best_val} from {best[0].name}")
+            print(f" {disp:>8}  {k:<16}  ** {best_val} from {best[1]:.2f} {best[0].unit_measure} x {best[0].name}")
 
     def print_prices(self):
         for prod, units in sorted(self.recipe, key=lambda i: i[1]):
@@ -236,8 +236,8 @@ def make_goals() -> tuple[list[float], dict[str, int]]:
 # gets the nutrient value of a given nutrient n
 # per unit_amount of the product. 0 if not exist
 def get_nutr_val(product: Product, n: str) -> float:
-    for pn in product.nutritions:
-        if pn.measure != product.unit_measure:
+    for pn in sorted(product.nutritions, key=lambda p: p.sureness, reverse=True):
+        if pn.measure != product.unit_measure or pn.sureness < 0.8:
             continue
 
         kvs = pn.nutrition.__dict__

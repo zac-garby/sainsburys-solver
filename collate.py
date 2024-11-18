@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import List
+from typing import Any, List
 from sqlmodel import Field, SQLModel, Session, create_engine, select
 from data import *
+from scrape import ignore_categories, filename_safe
 
 import json
 
@@ -84,6 +85,54 @@ def create_category(id: str, name: str, session: Session):
     category = Category(id=id, name=name)
     session.add(category)
 
+def assign_taxonomies(
+    session: Session,
+    taxonomy: dict[str, Any],
+    seen_pairs: set[tuple[str, int]],
+    prior: list[Taxonomy]
+):
+    name = taxonomy["name"]
+    id = taxonomy["id"]
+    children = taxonomy["children"]
+    if id in ignore_categories:
+        return
+
+    taxon = session.exec(select(Taxonomy).where(Taxonomy.id == id)).one_or_none()
+    if taxon is None:
+        taxon = Taxonomy(
+            id=id,
+            name=name,
+            parent=prior[-1] if len(prior) > 0 else None,
+        )
+        session.add(taxon)
+        session.commit()
+
+    new_prior = prior + [taxon]
+
+    path = Path("data/out").joinpath(*(filename_safe(p.name) for p in new_prior))
+    print(" > ".join(t.name for t in new_prior))
+    for child_file in path.rglob("*.json"):
+        prod_id = child_file.stem
+        if (prod_id, id) in seen_pairs:
+            continue
+
+        prod = session.exec(select(Product).where(Product.id == prod_id)).one_or_none()
+        if prod is not None:
+            prod.taxonomies.append(taxon)
+            seen_pairs.add((prod_id, id))
+            session.add(prod)
+
+    for child in children:
+        assign_taxonomies(session, child, seen_pairs, new_prior)
+
+def assign_all_taxonomies(session: Session):
+    seen_pairs = set()
+
+    with open('data/taxonomy.json') as f:
+        taxonomy = json.load(f)["data"]
+        for top_level in taxonomy:
+            assign_taxonomies(session, top_level, seen_pairs, prior=[])
+
 def main(session: Session):
     for filepath in Path('data/out').rglob('*.json'):
         if filepath.is_file():
@@ -95,6 +144,10 @@ def main(session: Session):
                 create_product(data["products"][0], session)
 
                 product = data["products"][0]
+
+    session.commit()
+    assign_all_taxonomies(session)
+    session.commit()
 
 if __name__ == "__main__":
     with Session(engine) as session:

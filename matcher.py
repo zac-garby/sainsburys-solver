@@ -44,9 +44,9 @@ def nutrient_similarity(pn: ProductNutrition, row: dict[str, float]) -> tuple[fl
                     r = math.exp(-prod_per_100g - row_per_100g)
                 else:
                     r = min(r, 1 / r)
-                ratios.append(r)
+                ratios.append(r * r)
 
-    if len(ratios) == 0:
+    if len(ratios) <= 2:
         return 0.0, 0.0
 
     return sum(ratios) / len(ratios), scale
@@ -112,7 +112,7 @@ def main(session: Session):
         if i % 500 == 0 and i > 0:
             print(f"done {i}")
 
-        scores, idxs = torch.topk(similarity[i], k=6)
+        scores, idxs = torch.topk(similarity[i], k=5)
         if scores[0] < 0.8:
             continue
 
@@ -130,28 +130,30 @@ def main(session: Session):
                 if closest is None or nutr_sim > best_nutr_sim:
                     closest, best_nutr_sim, best_scale = row, nutr_sim, scale
 
-            if closest is None or best_nutr_sim < 0.7:
+            if closest is None or best_nutr_sim < 0.5:
                 continue
 
             new_nutr = nutr_from(closest, best_scale)
-            new_pairings.append((new_nutr, pn))
+            new_pairings.append((new_nutr, pn, best_nutr_sim, closest))
 
     print(f"{len(new_pairings)} new pairings")
 
-    for new_nutr, _ in new_pairings:
+    for new_nutr, _, _, _ in new_pairings:
         session.add(new_nutr)
     session.commit()
 
     print(f"committed new nutritions")
 
-    for new_nutr, pn in new_pairings:
+    for new_nutr, pn, sureness, row in new_pairings:
         assert new_nutr.id is not None
 
         new_pn = ProductNutrition(
             amount=pn.amount,
             measure=pn.measure,
             product=pn.product,
-            nutrition_id=new_nutr.id
+            nutrition_id=new_nutr.id,
+            source=f"scraped from {row['name']} ({row['source']})",
+            sureness=sureness,
         )
         session.add(new_pn)
     session.commit()
