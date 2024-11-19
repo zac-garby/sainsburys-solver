@@ -1,27 +1,33 @@
 from dataclasses import dataclass
 from scipy.optimize import linprog
+from ortools.linear_solver import pywraplp
 from data import *
+from taxonomy_allowed import *
 
-target = {
-    "protein": (140, None),
-    "fat": (70, 85),
+import pulp
+
+Target = dict[str, tuple[float | None, float | None]]
+
+target: Target = {
+    "protein": (110, 120),
+    "fat": (60, 80),
     "sat_fat": (None, 15),
-    "carbohydrate": (250, 270),
+    "carbohydrate": (250, 300),
     "total_sugar": (None, 20),
-    "fibre": (45, None),
+    "fibre": (25, None),
     "sodium": (None, 2600e-3),
 
     "potassium": (3500e-3, None),
     "calcium": (1000e-3, None),
-    "magnesium": (350e-3, 600e-3),
+    "magnesium": (350e-3, None),
     # "chromium": (0, None),
     # "molybdenum": (0, None),
     "phosphorus": (550e-3, None),
-    "iron": (8.7e-3, 20e-3),
-    "copper": (1.4e-3, 5e-3),
+    "iron": (8.7e-3, None),
+    "copper": (1.4e-3, None),
     "zinc": (9.5e-3, None),
     # "manganese": (0e-3, None),
-    "selenium": (75e-6, 150e-6),
+    "selenium": (75e-6, None),
     "iodine": (140e-6, None),
 
     "vit_a": (700e-6, None),
@@ -32,11 +38,11 @@ target = {
     "vit_b1": (1e-3, None),
     "vit_b2": (1.3e-3, None),
     "vit_b3": (16.5e-3, None),
-    "vit_b5": (5e-3, None),
+    # "vit_b5": (5e-3, None),
     "vit_b6": (1.4e-3, None),
-    # "vit_b7": (0e-6, None),
+    "vit_b7": (0e-6, None),
     "vit_b9": (400e-6, None),
-    "vit_b12": (15e-6, None),
+    # "vit_b12": (15e-6, None),
 }
 
 disallowed_ids = [
@@ -50,59 +56,11 @@ disallowed_ids = [
     "7377250",
 ]
 
-disallowed_categories = [
-    "411852",   # Vits and supplements
-    "314371",   # All ham, cooked meats & pâté
-    "474595",   # Meat & fish essentials
-    "500860",   # Better for you meat & fish
-    "314374",   # Continental meats & salami
-    "428981",   # Cooked meats
-    "497366",   # Meat & fish bigger packs
-    "618858",   # Cooked meats, deli & dips
-    "461876",   # Meat, fish & poultry
-    "272760",   # Prepared meat & fish
-    "12482",    # Meat snacking
-    "218890",   # Mince & meatballs
-    "310878",   # Burgers, meatballs & sausages
-    "314945",   # Meat, fish & poultry
-    "497364",   # Chicken burgers, mince & meatballs
-    "269776",   # Diced, minced & meatballs
-    "13259",    # Cold meat
-    "13363",    # Bacon
-    "269770",   # Breasts, portions & thighs
-    "310866",   # Whole birds
-    "310864",   # All chicken
-]
-
-allowed_categories = [
-    "417421",   # Meat free
-    "489875",   # Meat free
-    "534857",   # All meat free
-    "13345",    # All fish & seafood
-    "369359",   # Smoked salmon & smoked fish
-    "490871",   # Eat more fish
-    "385373",   # Fish & chips
-    "276058",   # Lighter fish & chips
-    "314368",   # Prepared & Breaded Fish
-    "577865",   # Prepared Fish
-    "618863",   # Fish
-    "13351",    # Fishcakes & breaded fish
-    "314364",   # Cod & white fish
-    "218863",   # Fish fillets
-    "218859",   # Battered fish
-    "218858",   # Fish fingers
-    "314367",   # Smoked fish
-    "271269",   # Fish cakes
-    "218860",   # Breaded fish
-    "478387",   # Whole fish
-    "269805",   # Fish
-    "275974",   # Flavoured fish
-    "275971",   # Oily fish
-    "271271",   # Fish pies & meals
-    "271272",   # Flavoured fish
-]
-
-Target = dict[str, tuple[float | None, float | None]]
+min_to_use = {
+    "g": 25,
+    "ml": 25,
+    "serving": 1.0,
+}
 
 @dataclass
 class Solution:
@@ -170,11 +128,11 @@ class Solution:
         print(f"  total:   £{self.total_price:.2f}")
 
 def show_g(val: float) -> str:
-    if val < 1e-3:
+    if val <= 1e-3:
         disp = f"{val * 1e+6:.2f}µg"
-    elif val < 1:
+    elif val <= 1:
         disp = f"{val * 1e+3:.2f}mg"
-    elif val < 500:
+    elif val <= 500:
         disp = f"{val:.2f}g"
     else:
         disp = f"{val / 1e+3:.2f}kg"
@@ -209,8 +167,90 @@ class Problem:
         if not result.success:
             return None
 
+        return self.make_recipe(result.x)
+
+    def solve_ortools(self) -> Solution | None:
+        solver: pywraplp.Solver = pywraplp.Solver.CreateSolver("SCIP")
+        assert solver is not None
+
+        xs = [ solver.NumVar(0, solver.infinity(), f"x_{i}") for i in range(len(self.products)) ]
+        used = [ solver.BoolVar(f"used_{i}") for i in range(len(self.products)) ]
+
+        total_price = solver.Sum(xs[i] * self.prices[i] for i in range(len(self.products)))
+        # solver.Minimize(total_price)
+
+        solver.Minimize(solver.Sum(used))
+        solver.Add(total_price <= 3.0)
+
+        for i, goal in enumerate(self.goals):
+            amount = solver.Sum(
+                xs[j] * self.nutrient_amounts[i][j]
+                for j in range(len(self.products))
+                if self.nutrient_amounts[i][j] != 0)
+
+            solver.Add(amount <= goal)
+
+        for i, prod in enumerate(self.products):
+            at_least = min_to_use[prod.unit_measure] / prod.unit_amount
+            solver.Add(xs[i] >= at_least * used[i])
+            solver.Add(xs[i] <= 1000.0 * used[i])
+
+        solver.EnableOutput()
+        # solver.SetSolverSpecificParametersAsString("limits/gap = 0.1")
+        print(f"solving, with {solver.NumVariables()} variables")
+        status = solver.Solve()
+
+        if status in [pywraplp.Solver.OPTIMAL, pywraplp.Solver.FEASIBLE]:
+            x_vals = [ x.solution_value() if u.solution_value() else 0.0
+                    for x, u in zip(xs, used) ]
+            return self.make_recipe(x_vals)
+
+        return None
+
+    def solve_pulp(self) -> Solution | None:
+        # Define the problem
+        prob = pulp.LpProblem("Minimise", pulp.LpMinimize)
+
+        # Define decision variables
+        xs = [ pulp.LpVariable(f"x_{i}", lowBound=0) for i in range(len(self.products)) ]
+        used = [ pulp.LpVariable(f"used_{i}", cat='Binary') for i in range(len(self.products)) ]
+
+        # Total price
+        total_price = pulp.lpSum(xs[i] * self.prices[i] for i in range(len(self.products)))
+
+        # Objective function (minimize cost)
+        # prob += total_price, "Total Price"
+
+        # Objective function (minimise number of ingredients)
+        prob += pulp.lpSum(used) + total_price, "Total used"
+
+        # Nutrient constraints
+        for i, goal in enumerate(self.goals):
+            amount = pulp.lpSum(xs[j] * self.nutrient_amounts[i][j]
+                                for j in range(len(self.products))
+                                if self.nutrient_amounts[i][j] != 0)
+            prob += amount <= goal, f"Goal {i}"
+
+        # Product usage constraints
+        for i, prod in enumerate(self.products):
+            at_least = min_to_use[prod.unit_measure] / prod.unit_amount
+            prob += xs[i] >= at_least * used[i], f"Min Usage {i}"
+            prob += xs[i] <= 1000.0 * used[i], f"Max Usage {i}"
+
+        # Solve the problem
+        prob.solve(pulp.PULP_CBC_CMD(msg=True, timeLimit=120))
+
+        # Check the status of the solution
+        if pulp.LpStatus[prob.status] in ['Optimal', 'Feasible']:
+            x_vals = [xs[i].varValue if used[i].varValue else 0.0 for i in range(len(self.products))]
+            return self.make_recipe(x_vals) # type: ignore
+        else:
+            print("No optimal solution found")
+            return None
+
+    def make_recipe(self, xs: list[float]) -> Solution:
         recipe = []
-        for i, v in enumerate(result.x):
+        for i, v in enumerate(xs):
             prod = self.products[i]
             amount = v * prod.unit_amount
 
@@ -258,8 +298,8 @@ def make_product_data(
     products = list(filter(
         lambda p:
             p.id not in disallowed_ids and\
-            (any(c.id in allowed_categories for c in p.categories) or\
-                all(c.id not in disallowed_categories for c in p.categories)) and\
+            (any(c.id in taxonomy_whitelist for c in p.taxonomies) or\
+                all(c.id not in taxonomy_blacklist for c in p.taxonomies)) and\
             any(pn.measure == p.unit_measure for pn in p.nutritions),
         get_products(session)
     ))
@@ -282,18 +322,22 @@ def make_product_data(
 
     return nutrient_amounts, prices, bounds, products
 
-if __name__ == "__main__":
+def main():
     engine = get_engine()
 
     with Session(engine) as session:
+        print("finding products...")
         problem = Problem(target, session)
 
     print(f"{len(problem.products)} products found")
 
     print("\nsolving...")
-    recipe = problem.solve()
+    recipe = problem.solve_pulp()
 
     if recipe:
         recipe.print()
     else:
         print("failed to solve")
+
+if __name__ == "__main__":
+    main()

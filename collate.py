@@ -94,8 +94,6 @@ def assign_taxonomies(
     name = taxonomy["name"]
     id = taxonomy["id"]
     children = taxonomy["children"]
-    if id in ignore_categories:
-        return
 
     taxon = session.exec(select(Taxonomy).where(Taxonomy.id == id)).one_or_none()
     if taxon is None:
@@ -109,18 +107,23 @@ def assign_taxonomies(
 
     new_prior = prior + [taxon]
 
-    path = Path("data/out").joinpath(*(filename_safe(p.name) for p in new_prior))
+    path = Path("data/out").joinpath(*(filename_safe(p.name) for p in new_prior[1:]))
     print(" > ".join(t.name for t in new_prior))
     for child_file in path.rglob("*.json"):
         prod_id = child_file.stem
-        if (prod_id, id) in seen_pairs:
-            continue
 
         prod = session.exec(select(Product).where(Product.id == prod_id)).one_or_none()
         if prod is not None:
-            prod.taxonomies.append(taxon)
-            seen_pairs.add((prod_id, id))
+            if (prod_id, 0) not in seen_pairs:
+                prod.taxonomies.append(new_prior[0]) # add root
+                seen_pairs.add((prod_id, 0))
+
+            if (prod_id, id) not in seen_pairs:
+                prod.taxonomies.append(taxon)
+                seen_pairs.add((prod_id, id))
+
             session.add(prod)
+
 
     for child in children:
         assign_taxonomies(session, child, seen_pairs, new_prior)
@@ -128,24 +131,31 @@ def assign_taxonomies(
 def assign_all_taxonomies(session: Session):
     seen_pairs = set()
 
+    root = Taxonomy(
+        id=0,
+        name="Root",
+    )
+    session.add(root)
+    session.commit()
+
     with open('data/taxonomy.json') as f:
         taxonomy = json.load(f)["data"]
         for top_level in taxonomy:
-            assign_taxonomies(session, top_level, seen_pairs, prior=[])
+            assign_taxonomies(session, top_level, seen_pairs, prior=[root])
 
 def main(session: Session):
-    for filepath in Path('data/out').rglob('*.json'):
-        if filepath.is_file():
-            breadcrumb = '/'.join(filepath.parts[2:-1])
+    # for filepath in Path('data/out').rglob('*.json'):
+    #     if filepath.is_file():
+    #         breadcrumb = '/'.join(filepath.parts[2:-1])
 
-            with open(filepath, errors="ignore") as file:
-                data = json.load(file)
+    #         with open(filepath, errors="ignore") as file:
+    #             data = json.load(file)
 
-                create_product(data["products"][0], session)
+    #             create_product(data["products"][0], session)
 
-                product = data["products"][0]
+    #             product = data["products"][0]
 
-    session.commit()
+    # session.commit()
     assign_all_taxonomies(session)
     session.commit()
 
