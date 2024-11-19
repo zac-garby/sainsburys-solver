@@ -144,18 +144,18 @@ def assign_all_taxonomies(session: Session):
             assign_taxonomies(session, top_level, seen_pairs, prior=[root])
 
 def main(session: Session):
-    # for filepath in Path('data/out').rglob('*.json'):
-    #     if filepath.is_file():
-    #         breadcrumb = '/'.join(filepath.parts[2:-1])
+    for filepath in Path('data/out').rglob('*.json'):
+        if filepath.is_file():
+            breadcrumb = '/'.join(filepath.parts[2:-1])
 
-    #         with open(filepath, errors="ignore") as file:
-    #             data = json.load(file)
+            with open(filepath, errors="ignore") as file:
+                data = json.load(file)
 
-    #             create_product(data["products"][0], session)
+                create_product(data["products"][0], session)
 
-    #             product = data["products"][0]
+                product = data["products"][0]
 
-    # session.commit()
+    session.commit()
     assign_all_taxonomies(session)
     session.commit()
 
