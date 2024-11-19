@@ -32,34 +32,35 @@ target: Target = {
 
     "vit_a": (700e-6, None),
     "vit_c": (40e-3, None),
-    # "vit_d": (10e-6, None),
+    "vit_d": (10e-6, None),
     "vit_e": (4e-3, None),
     "vit_k": (75e-6, None),
     "vit_b1": (1e-3, None),
     "vit_b2": (1.3e-3, None),
     "vit_b3": (16.5e-3, None),
-    # "vit_b5": (5e-3, None),
+    "vit_b5": (5e-3, None),
     "vit_b6": (1.4e-3, None),
-    "vit_b7": (0e-6, None),
+    # # "vit_b7": (0e-6, None),
     "vit_b9": (400e-6, None),
-    # "vit_b12": (15e-6, None),
+    "vit_b12": (5e-6, None),
 }
 
 disallowed_ids = [
-    "2014357",
-    "7855654",
-    "8035841",
-    "8092711",
-    "6567540",
-    "8168098",
-    "7680389",
-    "7377250",
+    "7863309", # Some chicken that's categorised as fruit & veg?
+    "7861621", # Some chicken that's categorised as fruit & veg?
+    "8105729", # Bitter gourd (sounds yucky)
 ]
 
 min_to_use = {
-    "g": 25,
-    "ml": 25,
+    "g": 75,
+    "ml": 75,
     "serving": 1.0,
+}
+
+max_to_use = {
+    "g": 1000,
+    "ml": 1000,
+    "serving": 10,
 }
 
 @dataclass
@@ -222,7 +223,7 @@ class Problem:
         # prob += total_price, "Total Price"
 
         # Objective function (minimise number of ingredients)
-        prob += pulp.lpSum(used) + total_price, "Total used"
+        prob += pulp.lpSum(used) * 2 + total_price, "Total used"
 
         # Nutrient constraints
         for i, goal in enumerate(self.goals):
@@ -234,11 +235,12 @@ class Problem:
         # Product usage constraints
         for i, prod in enumerate(self.products):
             at_least = min_to_use[prod.unit_measure] / prod.unit_amount
+            at_most = max_to_use[prod.unit_measure] / prod.unit_amount
             prob += xs[i] >= at_least * used[i], f"Min Usage {i}"
-            prob += xs[i] <= 1000.0 * used[i], f"Max Usage {i}"
+            prob += xs[i] <= at_most * used[i], f"Max Usage {i}"
 
         # Solve the problem
-        prob.solve(pulp.PULP_CBC_CMD(msg=True, timeLimit=120))
+        prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=120))
 
         # Check the status of the solution
         if pulp.LpStatus[prob.status] in ['Optimal', 'Feasible']:
