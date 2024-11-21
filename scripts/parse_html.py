@@ -1,7 +1,7 @@
 from typing import List, Optional
 from bs4 import BeautifulSoup, PageElement, ResultSet, Tag
 from pathlib import Path
-from data import *
+from src.data import *
 
 import base64
 import json
@@ -329,6 +329,9 @@ if __name__ == "__main__":
                     data = json.load(file)
                     prod = data["products"][0]
                     uid = prod["product_uid"]
+
+                    if "details_html" not in prod:
+                        continue
 
                     html = base64.b64decode(prod["details_html"]).decode("utf-8")
 

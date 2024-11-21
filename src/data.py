@@ -3,10 +3,6 @@ from sqlalchemy import Engine, Sequence
 from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import Field, SQLModel, Session, Relationship, create_engine, select
 
-class ProductCategory(SQLModel, table=True):
-    product_id: str = Field(foreign_key="product.id", primary_key=True)
-    category_id: str = Field(foreign_key="category.id", primary_key=True)
-
 class ProductNutrition(SQLModel, table=True):
     product_id: str | None = Field(default=None, foreign_key="product.id", primary_key=True)
     nutrition_id: int | None = Field(default=None, foreign_key="nutrition.id", primary_key=True)
@@ -31,12 +27,6 @@ class Taxonomy(SQLModel, table=True):
     children: List["Taxonomy"] = Relationship(back_populates="parent")
     products: List["Product"] = Relationship(back_populates="taxonomies", link_model=ProductTaxonomy)
 
-class Category(SQLModel, table=True):
-    id: str = Field(primary_key=True)
-    name: str
-
-    products: List["Product"] = Relationship(back_populates="categories", link_model=ProductCategory)
-
 class Product(SQLModel, table=True):
     id: str = Field(primary_key=True)
     name: str
@@ -50,7 +40,6 @@ class Product(SQLModel, table=True):
     is_alcohol: bool = Field(default=False)
     brand: str | None = Field(default=None)
 
-    categories: List[Category] = Relationship(back_populates="products", link_model=ProductCategory)
     taxonomies: List[Taxonomy] = Relationship(back_populates="products", link_model=ProductTaxonomy)
     nutritions: List[ProductNutrition] = Relationship(back_populates="product")
 
@@ -95,20 +84,32 @@ class Nutrition(SQLModel, table=True):
     vit_b12: float | None = Field(default=None)
 
 
-def get_engine() -> Engine:
-    engine = create_engine("sqlite:///data/sainsbury.db")
+def get_engine(url: str = "sqlite:///data/sainsbury.db") -> Engine:
+    engine = create_engine(url)
     SQLModel.metadata.create_all(engine)
     return engine
 
 def get_products(
     session: Session,
-    selinload=False
+    load_all=False,
+    id_blacklist: list[str] = [],
+    taxonomy_blacklist: list[int] = [],
+    taxonomy_whitelist: list[int] = [],
+    only_proper_measures: bool = False,
 ) -> list[Product]:
-    stmt = select(Product)
+    stmt = select(Product).where(
+        (Product.id.notin_(id_blacklist)) & ( # type: ignore
+            (Product.taxonomies.any(Taxonomy.id.in_(taxonomy_whitelist))) | # type: ignore
+            (~Product.taxonomies.any(Taxonomy.id.in_(taxonomy_blacklist))) # type: ignore
+        ))
 
-    if selinload:
+    if only_proper_measures:
+        stmt = stmt.where(
+            Product.nutritions.any(ProductNutrition.measure == Product.unit_measure) # type: ignore
+        )
+
+    if load_all:
         stmt = stmt.options(
-            selectinload(Product.categories), # type: ignore
             selectinload(Product.taxonomies), # type: ignore
             selectinload(Product.nutritions).selectinload(ProductNutrition.nutrition) # type: ignore
         )

@@ -6,4 +6,8 @@ data/out
 *.sql
 *.pt
 .DS_Store
+.mypy_cache
+.ropeproject
+.ruff_cache
 __pycache__
+*.sqbpro

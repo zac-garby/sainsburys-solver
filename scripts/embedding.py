@@ -1,15 +1,13 @@
 from pathlib import Path
 from sentence_transformers import SentenceTransformer, util
+from sqlmodel import Session, select
+from src.data import Product, get_engine
 
 import random
 import csv
 import os
 import re
-from sqlmodel import Session, select
 import torch
-
-from data import Product
-import data
 
 prompt = "Nutritional information for %s"
 
@@ -114,7 +112,7 @@ def load_data():
     return (sainsbury, datas, torch.cat(embs, dim=0))
 
 if __name__ == "__main__":
-    engine = data.get_engine()
+    engine = get_engine()
     with Session(engine) as session:
         embed_db(session, Path("data") / "sainsbury.pt")
 

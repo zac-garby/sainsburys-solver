@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from scipy.optimize import linprog
 from ortools.linear_solver import pywraplp
-from data import *
-from taxonomy_allowed import *
+from src.data import *
 
 import pulp
 
@@ -17,18 +16,18 @@ target: Target = {
     "fibre": (25, None),
     "sodium": (None, 2600e-3),
 
-    "potassium": (3500e-3, None),
-    "calcium": (1000e-3, None),
-    "magnesium": (350e-3, None),
+    # "potassium": (3500e-3, None),
+    # "calcium": (1000e-3, None),
+    # "magnesium": (350e-3, None),
     # "chromium": (0, None),
     # "molybdenum": (0, None),
-    "phosphorus": (550e-3, None),
-    "iron": (8.7e-3, None),
-    "copper": (1.4e-3, None),
-    "zinc": (9.5e-3, None),
+    # "phosphorus": (550e-3, None),
+    # "iron": (8.7e-3, None),
+    # "copper": (1.4e-3, None),
+    # "zinc": (9.5e-3, None),
     # "manganese": (0e-3, None),
-    "selenium": (75e-6, None),
-    "iodine": (140e-6, None),
+    # "selenium": (75e-6, None),
+    # "iodine": (140e-6, None),
 
     "vit_a": (700e-6, None),
     "vit_c": (40e-3, None),
@@ -38,14 +37,29 @@ target: Target = {
     "vit_b1": (1e-3, None),
     "vit_b2": (1.3e-3, None),
     "vit_b3": (16.5e-3, None),
-    "vit_b5": (5e-3, None),
-    "vit_b6": (1.4e-3, None),
+    # "vit_b5": (5e-3, None),
+    # "vit_b6": (1.4e-3, None),
     # # "vit_b7": (0e-6, None),
-    "vit_b9": (400e-6, None),
-    "vit_b12": (5e-6, None),
+    # "vit_b9": (400e-6, None),
+    # "vit_b12": (5e-6, None),
 }
 
+taxonomy_blacklist = [
+
+]
+
+taxonomy_whitelist = [
+    # 1020082,    # Fruit & vegetables
+    # 1018774,    # All bread
+    # 1019536,    # Pulses, beans & lentils
+    # 1020363,    # Fish & seafood
+    # 1043310,    # Christmas
+]
+
+
 disallowed_ids = [
+    "8092711", # Wrong price (beef)
+    "6567540", # Wrong price (noodles)
     "7863309", # Some chicken that's categorised as fruit & veg?
     "7861621", # Some chicken that's categorised as fruit & veg?
     "8105729", # Bitter gourd (sounds yucky)
@@ -297,14 +311,19 @@ def make_product_data(
     prices = []
     bounds = []
 
-    products = list(filter(
-        lambda p:
-            p.id not in disallowed_ids and\
-            (any(c.id in taxonomy_whitelist for c in p.taxonomies) or\
-                all(c.id not in taxonomy_blacklist for c in p.taxonomies)) and\
-            any(pn.measure == p.unit_measure for pn in p.nutritions),
-        get_products(session)
-    ))
+    print("  getting product data")
+    products = get_products(
+        session,
+        load_all=True,
+        id_blacklist=disallowed_ids,
+        taxonomy_whitelist=taxonomy_whitelist,
+        taxonomy_blacklist=taxonomy_blacklist,
+        only_proper_measures=True,
+    )
+
+    # products = list(session.exec(stmt).all())
+    assert products is not None
+    print("  done. making nutrition data")
 
     for prod in products:
         prices.append(prod.unit_price)
@@ -322,19 +341,21 @@ def make_product_data(
                 nutrient_amounts[i].append(val)
                 i += 1
 
+    print("  done")
+
     return nutrient_amounts, prices, bounds, products
 
 def main():
     engine = get_engine()
 
     with Session(engine) as session:
-        print("finding products...")
+        print("setting up problem...")
         problem = Problem(target, session)
 
     print(f"{len(problem.products)} products found")
 
     print("\nsolving...")
-    recipe = problem.solve_pulp()
+    recipe = problem.solve()
 
     if recipe:
         recipe.print()

@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Any, List
 from sqlmodel import Field, SQLModel, Session, create_engine, select
-from data import *
-from scrape import ignore_categories, filename_safe
+from src.data import *
+from scrape import filename_safe
 
 import json
 
@@ -24,8 +24,8 @@ def convert_measure(measure: str, amount: float) -> tuple[str, float] | None:
             return ("serving", amount)
         case "bisc":
             return ("serving", amount)
-
-    return None
+        case _:
+            return None
 
 def create_product(product, session: Session):
     uid = product["product_uid"]
@@ -36,9 +36,11 @@ def create_product(product, session: Session):
     if "unit_price" in product:
         unit = product["unit_price"]
         retail = product["retail_price"]
-    else:
+    elif "catchweight" in product:
         unit = product["catchweight"][0]["unit_price"]
         retail = product["catchweight"][0]["retail_price"]
+    else:
+        return
 
     if "attributes" in product and "brand" in product["attributes"]:
         brand = product["attributes"]["brand"][0]
@@ -72,18 +74,6 @@ def create_product(product, session: Session):
         is_alcohol=product["is_alcoholic"],
         brand=brand
     ))
-
-    for cat in product["categories"]:
-        cat_id = cat["id"]
-        create_category(cat_id, cat["name"], session)
-        session.add(ProductCategory(product_id=uid, category_id=cat_id))
-
-def create_category(id: str, name: str, session: Session):
-    if ex := session.exec(select(Category).where(Category.id == id)).one_or_none():
-        return
-
-    category = Category(id=id, name=name)
-    session.add(category)
 
 def assign_taxonomies(
     session: Session,

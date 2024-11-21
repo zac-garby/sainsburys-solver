@@ -1,6 +1,6 @@
 import math
 from sqlmodel import Session, select
-from data import Nutrition, Product, ProductNutrition, get_engine
+from src.data import Nutrition, Product, ProductNutrition, get_engine
 from typing import Any
 
 import torch
