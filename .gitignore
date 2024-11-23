@@ -11,3 +11,4 @@ data/out
 .ruff_cache
 __pycache__
 *.sqbpro
+test.py
