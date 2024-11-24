@@ -15,7 +15,7 @@ async def product_query(
     id: str | None = Query(default=None),
     name: str | None = Query(default=None),
     taxon: int = Query(default=0),
-    limit: int = Query(default=5),
+    limit: int = Query(default=10),
     session: Session = Depends(get_session),
 ) -> list[Product]:
     query = select(Product).where(
@@ -31,34 +31,32 @@ async def product_query(
     prods = session.exec(query)
     return list(prods.all())
 
-@router.get("/product/{id}")
+@router.get("/product/{id}", response_model=ProductResponse)
 async def product_by_id(
     id: int,
     session: Session = Depends(get_session)
-) -> Product | None:
+):
     prod = session.get(Product, id)
 
     if not prod:
         return None
 
-    return prod
+    resp = collate_nutrition(prod)
+    return resp
 
-@router.get("/taxonomy")
-async def get_taxonomy(
+@router.get("/taxonomy", response_model=TaxonomyResponse)
+@router.get("/taxonomy/{id}", response_model=TaxonomyResponse)
+async def get_taxon_info(
+    id: int | None = 0,
     session: Session = Depends(get_session)
 ):
-    root = session.get(Taxonomy, 0)
+    root = session.get(Taxonomy, id)
     assert root is not None
-    return build_taxonomy_dict(root)
 
-def build_taxonomy_dict(taxon: Taxonomy):
-    data = {
-        "id": taxon.id,
-        "name": taxon.name,
-        "children": []
-    }
+    if root.parent is None:
+        return root
 
-    for child in taxon.children:
-        data["children"].append(build_taxonomy_dict(child))
-
-    return data
+    return TaxonomyResponse.from_orm(
+        root,
+        update={ "parent_name": root.parent.name }
+    )

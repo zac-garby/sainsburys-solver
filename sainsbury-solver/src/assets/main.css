@@ -1,0 +1,25 @@
+* {
+    box-sizing: border-box;
+    font-family: monospace;
+}
+
+html, body {
+    padding: 0;
+    margin: 0;
+    font-family: monospace;
+}
+
+#app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  background-color: rgb(250, 240, 240);
+}
+
+h1:first-child, p:first-child {
+    margin-top: 0;
+}
+
+a, a:visited, h1, h2, h3, h4 {
+    color: rgb(130, 30, 80);
+}
