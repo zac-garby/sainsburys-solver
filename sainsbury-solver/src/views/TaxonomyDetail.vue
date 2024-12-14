@@ -19,7 +19,7 @@ const {
     error: itemsError,
 } = useFetch(
     () =>
-        `http://localhost:8000/product/search?taxon=${route.params.id}&limit=80`,
+        `http://localhost:8000/product/search?taxon=${route.params.id}&limit=20`,
 );
 </script>
 
