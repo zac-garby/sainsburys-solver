@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.applications import FastAPI
 from sqlalchemy.sql import func
 from sqlmodel import Session
@@ -36,11 +36,21 @@ async def product_query(
 
 @router.get("/product/lucky")
 async def product_lucky(
+    only_food: bool = Query(default=True),
     session: Session = Depends(get_session),
 ) -> str:
-    query = select(Product.id).order_by(func.random()).limit(1)
-    result = session.exec(query)
-    return str(result.first())
+    if only_food:
+        query = select(ProductNutrition).order_by(func.random()).limit(1)
+        result = session.exec(query).first()
+
+        if result and result.product:
+            return result.product.id
+    else:
+        query = select(Product.id).order_by(func.random()).limit(1)
+        result = session.exec(query).first()
+        return str(result)
+
+    raise HTTPException(status_code=500, detail="Unlucky.")
 
 @router.get("/product/{id}", response_model=ProductResponse)
 async def product_by_id(
