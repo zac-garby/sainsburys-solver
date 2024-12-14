@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from fastapi.applications import FastAPI
+from sqlalchemy.sql import func
 from sqlmodel import Session
 from src.data import *
 
@@ -32,6 +33,14 @@ async def product_query(
 
     prods = session.exec(query)
     return list(prods.all())
+
+@router.get("/product/lucky")
+async def product_lucky(
+    session: Session = Depends(get_session),
+) -> str:
+    query = select(Product.id).order_by(func.random()).limit(1)
+    result = session.exec(query)
+    return str(result.first())
 
 @router.get("/product/{id}", response_model=ProductResponse)
 async def product_by_id(

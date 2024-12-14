@@ -20,6 +20,19 @@ const routes = [
         name: "ProductDetail",
         component: ProductDetail,
     },
+    {
+        path: "/lucky",
+        name: "Lucky",
+        beforeEnter: async (to, from, next) => {
+            await fetch("http://localhost:8000/product/lucky")
+                .then((res) => res.json())
+                .then((id) => next(`/product/${id}`))
+                .catch((err) => {
+                    console.error(err)
+                    next(false)
+                })
+        }
+    }
 ];
 
 const router = createRouter({
