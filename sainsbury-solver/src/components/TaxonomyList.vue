@@ -20,12 +20,8 @@ const { loading, data: taxonomy, error } = useFetch("http://localhost:8000/taxon
 <style scoped>
 ul {
     margin-top: 0;
+    margin-bottom: 0;
     list-style: none;
     padding: 0;
-}
-
-div.taxonomy-list {
-    padding-top: 10px;
-    padding-bottom: 10px;
 }
 </style>
