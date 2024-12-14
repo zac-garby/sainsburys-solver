@@ -67,7 +67,6 @@ div.search-area {
 input {
     display: block;
     width: 100%;
-    font-family: monospace;
     border: 1px solid grey;
     padding-inline: 5px;
 }

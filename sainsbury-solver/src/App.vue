@@ -5,7 +5,7 @@
         </h1>
         <nav>
             <router-link to="/">Home</router-link>
-            <router-link to="/calc">Calculator</router-link>
+            <router-link to="/scratch">Scratchpad</router-link>
             <router-link to="/recipes">Recipes</router-link>
             <router-link to="/lucky">I'm Feeling Lucky</router-link>
         </nav>

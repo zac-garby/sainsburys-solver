@@ -32,8 +32,8 @@ const {
             {{ product["unit_amount"] }} {{ product["unit_measure"] }}
             (£{{ product["retail_price"].toFixed(2) }} retail)
         </p>
-        <p>{{ product["description"] }} <a :href="product['url']">[View on Sainsbury's]</a></p>
-        <TaxonomySublist :taxonomy />
+        <p>{{ product["description"] }}</p>
+        <p><a :href="product['url']">View on Sainsbury's</a></p>
         <h2>Nutrition Information</h2>
         <NutritionTable
             :nutr="product['total_nutrition']"
@@ -41,7 +41,7 @@ const {
         <p>
             Total nutrition information collated from Sainsbury's website,
             and by matching against several nutrient databases for micronutrients.
-            Data from Sainsbury's is prioritised.
+            Data from Sainsbury's is prioritised. Correctness is <u>not</u> guaranteed.
         </p>
         <p>
             Below is a listing of all of the data sources from which the above is
@@ -61,6 +61,12 @@ const {
                 </tr>
             </NutritionTable>
         </div>
+        <h2>Taxonomical Context</h2>
+        <p>
+            See below for all taxonomical categories which this product
+            belongs to.
+        </p>
+        <TaxonomySublist :taxonomy />
     </template>
 </template>
 
@@ -77,6 +83,8 @@ table.nutrition thead {
 }
 
 table.nutrition td {
+    padding-top: 3px;
+    padding-bottom: 3px;
     padding-left: 5px;
     padding-right: 25px;
 }

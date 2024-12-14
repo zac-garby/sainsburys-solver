@@ -34,6 +34,7 @@ ul {
 }
 
 button.toggle {
+    font-family: monospace;
     cursor: pointer;
     background: none;
     border: none;
@@ -45,5 +46,6 @@ button.toggle {
 span.spacer {
     margin-right: 5px;
     font-size: 1em;
+    font-family: monospace;
 }
 </style>

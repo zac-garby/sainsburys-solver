@@ -9,7 +9,11 @@ import ProductDetail from "./views/ProductDetail.vue";
 import App from "./App.vue";
 
 const routes = [
-    { path: "/", name: "Home", component: Home },
+    {
+        path: "/",
+        name: "Home",
+        component: Home
+    },
     {
         path: "/taxonomy/:id",
         name: "TaxonomyDetail",
