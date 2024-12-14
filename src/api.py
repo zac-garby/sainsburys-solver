@@ -15,18 +15,20 @@ async def product_query(
     id: str | None = Query(default=None),
     name: str | None = Query(default=None),
     taxon: int = Query(default=0),
-    limit: int = Query(default=10),
+    limit: int = Query(default=10, ge=0, le=100),
+    offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
 ) -> list[Product]:
     query = select(Product).where(
         Product.taxonomies.any(Taxonomy.id == taxon) # type: ignore
-    ).limit(limit).order_by(Product.id)
+    ).order_by(Product.id).limit(limit).offset(offset)
 
     if id:
         query = query.where(Product.id == id)
 
     if name:
-        query = query.where(Product.name.ilike(f"%{name}%")) # type: ignore
+        for word in name.split():
+            query = query.where(Product.name.ilike(f"%{word}%")) # type: ignore
 
     prods = session.exec(query)
     return list(prods.all())
@@ -44,19 +46,33 @@ async def product_by_id(
     resp = collate_nutrition(prod)
     return resp
 
-@router.get("/taxonomy", response_model=TaxonomyResponse)
-@router.get("/taxonomy/{id}", response_model=TaxonomyResponse)
+@router.get("/taxonomy", response_model=TaxonomyResponse | None)
+@router.get("/taxonomy/{id}", response_model=TaxonomyResponse | None)
 async def get_taxon_info(
     id: int | None = 0,
     session: Session = Depends(get_session)
 ):
     root = session.get(Taxonomy, id)
-    assert root is not None
+    if root is None:
+        return root
 
     if root.parent is None:
         return root
 
-    return TaxonomyResponse.from_orm(
-        root,
-        update={ "parent_name": root.parent.name }
-    )
+    return taxonomy_reponse(root)
+
+@router.get("/taxonomy/containing-product/{id}", response_model=TaxonomyResponse | None)
+async def get_taxonomies_containing_product(
+    id: int,
+    session: Session = Depends(get_session)
+):
+    prod = session.get(Product, id)
+    if not prod:
+        return None
+
+    root = session.get(Taxonomy, 0)
+    assert root is not None
+
+    taxonomy_ids = [ taxon.id for taxon in prod.taxonomies ]
+
+    return taxonomy_reponse(root, filter_ids=taxonomy_ids)

@@ -13,8 +13,11 @@ function toggle() {
 
 <template>
     <span>
+        <button class="toggle" @click="toggle" v-if="hasChildren">
+            [{{ collapsed ? "+" : "-" }}]
+        </button>
+        <span class="spacer" v-else>&nbsp;*&nbsp;</span>
         <router-link :to="detailLink">{{ props.taxonomy["name"] }}</router-link>
-        <button class="toggle" @click="toggle" v-if="hasChildren">[{{ collapsed ? "+" : "-" }}]</button>
     </span>
     <ul v-if="hasChildren && !collapsed">
         <li v-for="child in props.taxonomy['children']">
@@ -23,10 +26,11 @@ function toggle() {
     </ul>
 </template>
 
-<style>
+<style scoped>
 ul {
-    padding-left: 20px;
+    padding-left: 30px;
     margin: 0;
+    list-style: none;
 }
 
 button.toggle {
@@ -34,6 +38,12 @@ button.toggle {
     background: none;
     border: none;
     padding: 0;
-    margin-left: 5px;
+    margin-right: 5px;
+    font-size: 1em;
+}
+
+span.spacer {
+    margin-right: 5px;
+    font-size: 1em;
 }
 </style>

@@ -1,0 +1,19 @@
+[
+    {
+        "label": "FastAPI Server",
+        "command": "fastapi dev main.py",
+        "use_new_terminal": true,
+        "reveal": "no_focus"
+    },
+    {
+        "label": "Vue Server",
+        "command": "cd sainsbury-solver && npm run dev",
+        "use_new_terminal": true,
+        "reveal": "no_focus"
+    },
+    {
+        "label": "Run Solver ...",
+        "command": "source .venv/bin/activate && python3 -m scripts.solver",
+        "use_new_terminal": false
+    }
+]

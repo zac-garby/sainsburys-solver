@@ -8,15 +8,22 @@ import NutritionTable from "../components/NutritionTable.vue";
 const route = useRoute();
 
 const {
-    loading,
+    loading: loading,
     data: product,
     error: error,
 } = useFetch(() => `http://localhost:8000/product/${route.params.id}`);
+
+const {
+    loading: taxonomyLoading,
+    data: taxonomy,
+    error: taxonomyError,
+} = useFetch(() => `http://localhost:8000/taxonomy/containing-product/${route.params.id}`);
 </script>
 
 <template>
-    <div v-if="loading">Loading...</div>
+    <div v-if="loading || taxonomyLoading">Loading...</div>
     <div v-else-if="error">{{ error }}</div>
+    <div v-else-if="taxonomyError">{{ taxonomyError }}</div>
     <template v-else>
         <img :src="product['image_url']" />
         <h2>{{ product["name"] }}</h2>
@@ -26,6 +33,7 @@ const {
             (£{{ product["retail_price"].toFixed(2) }} retail)
         </p>
         <p>{{ product["description"] }} <a :href="product['url']">[View on Sainsbury's]</a></p>
+        <TaxonomySublist :taxonomy />
         <h2>Nutrition Information</h2>
         <NutritionTable
             :nutr="product['total_nutrition']"

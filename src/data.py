@@ -172,3 +172,23 @@ def collate_nutrition(product: Product) -> ProductResponse:
     )
 
     return resp
+
+def taxonomy_reponse(
+    root: Taxonomy,
+    filter_ids: list[int] | None = None
+) -> TaxonomyResponse | None:
+    if filter_ids is not None and root.id not in filter_ids:
+        return None
+
+    child_responses = [
+        response for child in root.children
+        if (response := taxonomy_reponse(child, filter_ids)) is not None
+    ]
+
+    return TaxonomyResponse.from_orm(
+        root,
+        update={
+            "parent_name": root.parent.name if root.parent else None,
+            "children": child_responses,
+        }
+    )

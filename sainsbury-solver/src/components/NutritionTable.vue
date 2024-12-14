@@ -42,7 +42,7 @@ const nutrKeys = [
 function showG(key, val) {
     if (key == "energy") {
         // special case for kcal
-        return `${val}kcal`
+        return `${val.toFixed(0)}kcal`
     }
 
     let disp;

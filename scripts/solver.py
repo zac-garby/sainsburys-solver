@@ -9,23 +9,23 @@ Target = dict[str, tuple[float | None, float | None]]
 
 target: Target = {
     "protein": (110, 120),
-    "fat": (60, 80),
-    "sat_fat": (None, 15),
-    "carbohydrate": (250, 300),
-    "total_sugar": (None, 20),
-    "fibre": (25, None),
+    "fat": (154, 160),
+    "sat_fat": (None, 65),
+    "carbohydrate": (0, 20),
+    "total_sugar": (None, 10),
+    "fibre": (40, None),
     "sodium": (None, 2600e-3),
 
     "potassium": (3500e-3, None),
     "calcium": (1000e-3, None),
     "magnesium": (350e-3, None),
-    "chromium": (0, None),
-    "molybdenum": (0, None),
+    # "chromium": (0, None),
+    # "molybdenum": (0, None),
     "phosphorus": (550e-3, None),
     "iron": (8.7e-3, None),
     "copper": (1.4e-3, None),
     "zinc": (9.5e-3, None),
-    "manganese": (0e-3, None),
+    # "manganese": (0e-3, None),
     "selenium": (75e-6, None),
     "iodine": (140e-6, None),
 
@@ -41,21 +41,8 @@ target: Target = {
     "vit_b6": (1.4e-3, None),
     # "vit_b7": (0e-6, None),
     "vit_b9": (400e-6, None),
-    "vit_b12": (5e-6, None),
+    "vit_b12": (15e-6, None),
 }
-
-global_taxonomy_blacklist = [
-
-]
-
-global_taxonomy_whitelist = [
-    # 1020082,    # Fruit & vegetables
-    # 1018774,    # All bread
-    # 1019536,    # Pulses, beans & lentils
-    # 1020363,    # Fish & seafood
-    # 1043310,    # Christmas
-]
-
 
 global_id_blacklist = [
     "8092711", # Wrong price (beef)
@@ -65,11 +52,12 @@ global_id_blacklist = [
     "7861621", # Some chicken that's categorised as fruit & veg?
     "8105729", # Bitter gourd (sounds yucky)
     "8168098", # Yoghurt with incorrect vit D
+    "8079236", # Cheestrings, incorrect B6
 ]
 
 min_to_use = {
-    "g": 75,
-    "ml": 75,
+    "g": 5,
+    "ml": 5,
     "serving": 1.0,
 }
 
@@ -224,8 +212,6 @@ class Problem:
             session,
             load_all=True,
             id_blacklist=global_id_blacklist,
-            taxonomy_whitelist=global_taxonomy_whitelist,
-            taxonomy_blacklist=global_taxonomy_blacklist,
             only_proper_measures=True,
         )
 
@@ -235,6 +221,13 @@ class Problem:
 
         if any(t.id in self.taxonomy_blacklist for t in product.taxonomies) and\
                 not any(t.id in self.taxonomy_whitelist for t in product.taxonomies):
+            return False
+
+        if len(product.nutritions) == 0:
+            return False
+
+        _, src, _ = get_nutr_val(product, "carbohydrate")
+        if src == "no source":
             return False
 
         return True
@@ -254,11 +247,14 @@ class Problem:
                     ns.append(self.all_nutrient_amounts[j][i])
 
     def solve(self) -> Solution | None:
+        if len(self.products) == 0:
+            return None
+
         result = linprog(
-            c=self.all_prices,
-            A_ub=self.all_nutrient_amounts,
+            c=self.prices,
+            A_ub=self.nutrient_amounts,
             b_ub=self.goals,
-            bounds=self.all_bounds,
+            bounds=self.bounds,
             method="highs"
         )
 
@@ -271,28 +267,31 @@ class Problem:
         solver: pywraplp.Solver = pywraplp.Solver.CreateSolver("SCIP")
         assert solver is not None
 
-        xs = [ solver.NumVar(0, solver.infinity(), f"x_{i}") for i in range(len(self.all_products)) ]
-        used = [ solver.BoolVar(f"used_{i}") for i in range(len(self.all_products)) ]
+        xs = [ solver.NumVar(0, solver.infinity(), f"x_{i}") for i in range(len(self.products)) ]
+        used = [ solver.BoolVar(f"used_{i}") for i in range(len(self.products)) ]
 
-        total_price = solver.Sum(xs[i] * self.all_prices[i] for i in range(len(self.all_products)))
-        # solver.Minimize(total_price)
+        total_price = solver.Sum(xs[i] * self.prices[i] for i in range(len(self.products)))
 
-        solver.Minimize(solver.Sum(used))
-        solver.Add(total_price <= 3.0)
+        solver.Minimize(total_price + solver.Sum(used) * 0.5)
+        # solver.Minimize(solver.Sum(used))
+        # solver.Add(total_price <= 4.0)
+        # solver.Add(solver.Sum(used) <= 5)
 
         for i, goal in enumerate(self.goals):
             amount = solver.Sum(
-                xs[j] * self.all_nutrient_amounts[i][j]
-                for j in range(len(self.all_products))
-                if self.all_nutrient_amounts[i][j] != 0)
+                xs[j] * self.nutrient_amounts[i][j]
+                for j in range(len(self.products))
+                if self.nutrient_amounts[i][j] != 0)
 
             solver.Add(amount <= goal)
 
-        for i, prod in enumerate(self.all_products):
+        for i, prod in enumerate(self.products):
             at_least = min_to_use[prod.unit_measure] / prod.unit_amount
+            at_most = max_to_use[prod.unit_measure] / prod.unit_amount
             solver.Add(xs[i] >= at_least * used[i])
-            solver.Add(xs[i] <= 1000.0 * used[i])
+            solver.Add(xs[i] <= at_most * used[i])
 
+        solver.SetNumThreads(8)
         solver.EnableOutput()
         # solver.SetSolverSpecificParametersAsString("limits/gap = 0.1")
         print(f"solving, with {solver.NumVariables()} variables")
@@ -305,52 +304,10 @@ class Problem:
 
         return None
 
-    def solve_pulp(self) -> Solution | None:
-        # Define the problem
-        prob = pulp.LpProblem("Minimise", pulp.LpMinimize)
-
-        # Define decision variables
-        xs = [ pulp.LpVariable(f"x_{i}", lowBound=0) for i in range(len(self.all_products)) ]
-        used = [ pulp.LpVariable(f"used_{i}", cat='Binary') for i in range(len(self.all_products)) ]
-
-        # Total price
-        total_price = pulp.lpSum(xs[i] * self.all_prices[i] for i in range(len(self.all_products)))
-
-        # Objective function (minimize cost)
-        # prob += total_price, "Total Price"
-
-        # Objective function (minimise number of ingredients)
-        prob += pulp.lpSum(used) * 2 + total_price, "Total used"
-
-        # Nutrient constraints
-        for i, goal in enumerate(self.goals):
-            amount = pulp.lpSum(xs[j] * self.all_nutrient_amounts[i][j]
-                                for j in range(len(self.all_products))
-                                if self.all_nutrient_amounts[i][j] != 0)
-            prob += amount <= goal, f"Goal {i}"
-
-        # Product usage constraints
-        for i, prod in enumerate(self.all_products):
-            at_least = min_to_use[prod.unit_measure] / prod.unit_amount
-            at_most = max_to_use[prod.unit_measure] / prod.unit_amount
-            prob += xs[i] >= at_least * used[i], f"Min Usage {i}"
-            prob += xs[i] <= at_most * used[i], f"Max Usage {i}"
-
-        # Solve the problem
-        prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=120))
-
-        # Check the status of the solution
-        if pulp.LpStatus[prob.status] in ['Optimal', 'Feasible']:
-            x_vals = [xs[i].varValue if used[i].varValue else 0.0 for i in range(len(self.all_products))]
-            return self.make_recipe(x_vals) # type: ignore
-        else:
-            print("No optimal solution found")
-            return None
-
     def make_recipe(self, xs: list[float]) -> Solution:
         recipe = []
         for i, v in enumerate(xs):
-            prod = self.all_products[i]
+            prod = self.products[i]
             amount = v * prod.unit_amount
 
             if amount > 0:
@@ -378,9 +335,26 @@ def main():
     with Session(engine) as session:
         problem = Problem(target, session)
 
-    print(f"{len(problem.all_products)} products found")
     problem.set_target(target)
+    problem.taxonomy_blacklist = [0]
+    problem.taxonomy_whitelist = [
+        1019184,
+        1019250,
+        1019895,
+        1019902,
+        1019909,
+        1019924,
+        1019934,
+        1019943,
+        1019988,
+        1019999,
+        1019883,
+        1020082,
+        1020363,
+        1020378,
+    ]
     problem.reapply_filter()
+    print(f"{len(problem.products)} products found")
     recipe = problem.solve()
 
     if recipe:
