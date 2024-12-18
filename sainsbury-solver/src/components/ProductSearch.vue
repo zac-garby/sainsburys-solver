@@ -16,15 +16,12 @@ function debounce(f, delay) {
 }
 
 function search(query) {
-    console.log("searching for", query)
-
     var url = new URL("http://localhost:8000/product/search")
     url.searchParams.append("name", query)
 
     fetch(url)
         .then((res) => res.json())
         .then((json) => {
-            console.log("got results:", json)
             results.value = json
         })
         .catch((err) => {
@@ -33,6 +30,19 @@ function search(query) {
 }
 
 var debouncedSearch = debounce(search, 250)
+
+var searchHideTimeout = null
+
+function showSearch() {
+    window.clearTimeout(searchHideTimeout)
+    isActive.value = true
+}
+
+function hideSearch() {
+    searchHideTimeout = window.setTimeout(() => {
+        isActive.value = false
+    }, 100)
+}
 
 var query = ref("")
 var isActive = ref(false)
@@ -46,8 +56,8 @@ var results = ref([])
         placeholder="Search for a product..."
         v-model="query"
         @input="debouncedSearch(query)"
-        @focus="isActive = true"
-        @blur="setTimeout(() => { isActive = false }, 25)" />
+        @focus="showSearch()"
+        @blur="hideSearch()" />
     <ul :hidden="!isActive || results.length == 0 || query.trim().length == 0">
         <li v-for="item in results">
             <a :href="`/product/${item['id']}`">{{ item["name"] }}</a>
