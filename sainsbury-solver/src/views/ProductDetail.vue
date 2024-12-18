@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { useFetch } from "../composable/fetch.js";
 
@@ -18,6 +19,16 @@ const {
     data: taxonomy,
     error: taxonomyError,
 } = useFetch(() => `http://localhost:8000/taxonomy/containing-product/${route.params.id}`);
+
+const productURL = computed(() => {
+    var url = product.value?.url
+
+    if (url.startsWith("://")) {
+        return "https" + url
+    }
+
+    return url
+});
 </script>
 
 <template>
@@ -33,7 +44,7 @@ const {
             (£{{ product["retail_price"].toFixed(2) }} retail)
         </p>
         <p>{{ product["description"] }}</p>
-        <p><a :href="product['url']">View on Sainsbury's</a></p>
+        <p><a :href="productURL">View on Sainsbury's</a></p>
         <h2>Nutrition Information</h2>
         <NutritionTable
             :nutr="product['total_nutrition']"
