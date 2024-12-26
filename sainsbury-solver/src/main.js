@@ -6,6 +6,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import Home from "./views/Home.vue";
 import TaxonomyDetail from "./views/TaxonomyDetail.vue";
 import ProductDetail from "./views/ProductDetail.vue";
+import Scratchpad from "./views/Scratchpad.vue";
 import App from "./App.vue";
 
 const routes = [
@@ -23,6 +24,11 @@ const routes = [
         path: "/product/:id",
         name: "ProductDetail",
         component: ProductDetail,
+    },
+    {
+        path: "/scratch",
+        name: "Scratchpad",
+        component: Scratchpad,
     },
     {
         path: "/lucky",
