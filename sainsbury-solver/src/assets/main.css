@@ -40,3 +40,24 @@ h2, h2 * {
 h3, h3 * {
     font-size: 1.1rem;
 }
+
+table {
+    border-spacing: 0;
+}
+
+table thead {
+    font-weight: bold;
+    background-color: rgb(130, 30, 80);
+    color: white;
+}
+
+table td {
+    padding-top: 3px;
+    padding-bottom: 3px;
+    padding-left: 5px;
+    padding-right: 25px;
+}
+
+table td:last-child {
+    padding-right: 5px;
+}

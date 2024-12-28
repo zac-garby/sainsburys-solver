@@ -1,6 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel
-from sqlalchemy import Engine, Sequence
+from sqlalchemy import Engine, Result, Sequence
 from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import Field, SQLModel, Session, Relationship, create_engine, select
 
@@ -64,6 +64,10 @@ class ProductResponse(ProductBase):
     nutritions: List[ProductNutritionResponse]
     total_nutrition: "NutritionResponse"
 
+class ShortProductResponse(ProductBase):
+    id: str
+    total_nutrition: "NutritionResponse"
+
 class NutritionBase(SQLModel):
     energy: float | None = Field(default=None)
     protein: float | None = Field(default=None)
@@ -108,6 +112,29 @@ class Nutrition(NutritionBase, table=True):
 class NutritionResponse(NutritionBase):
     pass
 
+class ScratchpadItemBase(SQLModel):
+    num_units: float
+
+class ScratchpadItem(ScratchpadItemBase, table=True):
+    scratchpad_id: int | None = Field(default=None, foreign_key="scratchpad.id", primary_key=True)
+    product_id: str | None = Field(default=None, foreign_key="product.id", primary_key=True)
+
+    scratchpad: Optional["Scratchpad"] = Relationship(back_populates="items")
+    product: Optional[Product] = Relationship()
+
+class ScratchpadItemResponse(ScratchpadItemBase):
+    product: ShortProductResponse
+
+class ScratchpadBase(SQLModel):
+    name: str
+
+class Scratchpad(ScratchpadBase, table=True):
+    id: int = Field(primary_key=True)
+    items: List[ScratchpadItem] = Relationship(back_populates="scratchpad")
+
+class ScratchpadResponse(ScratchpadBase):
+    id: int
+    items: List[ScratchpadItemResponse]
 
 def get_engine(url: str = "sqlite:///data/sainsbury.db") -> Engine:
     engine = create_engine(url)
@@ -190,5 +217,26 @@ def taxonomy_reponse(
         update={
             "parent_name": root.parent.name if root.parent else None,
             "children": child_responses,
+        }
+    )
+
+def scratchpad_response(scratch: Scratchpad) -> ScratchpadResponse:
+    items = []
+
+    for item in scratch.items:
+        if not item.product:
+            continue
+
+        items.append(ScratchpadItemResponse.from_orm(
+            item,
+            update={
+                "product": collate_nutrition(item.product)
+            }
+        ))
+
+    return ScratchpadResponse.from_orm(
+        scratch,
+        update={
+            "items": items,
         }
     )

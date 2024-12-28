@@ -95,3 +95,14 @@ async def get_taxonomies_containing_product(
     taxonomy_ids = [ taxon.id for taxon in prod.taxonomies ]
 
     return taxonomy_reponse(root, filter_ids=taxonomy_ids)
+
+@router.get("/scratch/{id}", response_model=ScratchpadResponse | None)
+async def get_scratchpad(
+    id: int,
+    session: Session = Depends(get_session)
+):
+    scratch = session.get(Scratchpad, id)
+    if not scratch:
+        return None
+
+    return scratchpad_response(scratch)

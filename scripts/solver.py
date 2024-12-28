@@ -8,13 +8,13 @@ import pulp
 Target = dict[str, tuple[float | None, float | None]]
 
 target: Target = {
-    "protein": (110, 120),
-    "fat": (154, 160),
-    "sat_fat": (None, 65),
-    "carbohydrate": (0, 20),
+    "protein": (130, 140),
+    "fat": (50, 60),
+    "sat_fat": (None, 15),
+    "carbohydrate": (150, 190),
     "total_sugar": (None, 10),
     "fibre": (40, None),
-    "sodium": (None, 2600e-3),
+    "sodium": (2400e-3, 2600e-3),
 
     "potassium": (3500e-3, None),
     "calcium": (1000e-3, None),
@@ -145,14 +145,14 @@ def show_g(val: float) -> str:
 class Problem:
     all_nutrient_amounts: list[list[float]]
     all_prices: list[float]
-    all_bounds: list[tuple[float, float]]
+    all_bounds: list[tuple[float | None, float | None]]
     all_products: list[Product]
 
     goals: list[float]
     goals_map: dict[str, int]
     nutrient_amounts: list[list[float]]
     prices: list[float]
-    bounds: list[tuple[float, float]]
+    bounds: list[tuple[float | None, float | None]]
     products: list[Product]
 
     target: Target
@@ -191,7 +191,7 @@ class Problem:
 
         for prod in self.all_products:
             self.all_prices.append(prod.unit_price)
-            self.all_bounds.append((0.0, 100.0))
+            self.all_bounds.append((0.0, None))
 
             i = 0
             for k, (mn, mx) in target.items():
@@ -231,6 +231,13 @@ class Problem:
             return False
 
         return True
+
+    def set_bounds(self, product_id: str, min: float | None, max: float | None = None):
+        prod = next(p for p in self.all_products if p.id == product_id)
+        if not self.product_allowed(prod):
+            print("bounds set for disallowed product:", prod.name)
+        idx = self.all_products.index(prod)
+        self.all_bounds[idx] = (min, max)
 
     def reapply_filter(self):
         self.nutrient_amounts = [[] for _ in self.goals]
@@ -336,6 +343,7 @@ def main():
         problem = Problem(target, session)
 
     problem.set_target(target)
+
     problem.taxonomy_blacklist = [0]
     problem.taxonomy_whitelist = [
         1019184,
@@ -352,9 +360,13 @@ def main():
         1020082,
         1020363,
         1020378,
+        1018859,
     ]
+
+    problem.set_bounds("6334094", 2)
     problem.reapply_filter()
     print(f"{len(problem.products)} products found")
+
     recipe = problem.solve()
 
     if recipe:

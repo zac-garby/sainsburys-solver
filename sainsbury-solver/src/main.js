@@ -26,7 +26,7 @@ const routes = [
         component: ProductDetail,
     },
     {
-        path: "/scratch",
+        path: "/scratch/:id",
         name: "Scratchpad",
         component: Scratchpad,
     },
