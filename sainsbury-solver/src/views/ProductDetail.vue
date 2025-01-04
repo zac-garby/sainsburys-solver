@@ -68,7 +68,10 @@ const productURL = computed(() => {
                     <td colspan="2" class="source">source: {{ nutr["source"] }}</td>
                 </tr>
                 <tr>
-                    <td colspan="2" class="source">sureness: {{ nutr["sureness"] }}</td>
+                    <td colspan="2" class="source">for '{{ nutr['nutrition']['name'] }}', from {{ nutr['nutrition']['source'] }}</td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="source">scaled by: {{ nutr["scale"].toFixed(2) }}</td>
                 </tr>
             </NutritionTable>
         </div>

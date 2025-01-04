@@ -9,9 +9,9 @@ Target = dict[str, tuple[float | None, float | None]]
 
 target: Target = {
     "protein": (130, 140),
-    "fat": (50, 60),
+    "fat": (50, 65),
     "sat_fat": (None, 15),
-    "carbohydrate": (150, 190),
+    "carbohydrate": (180, 220),
     "total_sugar": (None, 10),
     "fibre": (40, None),
     "sodium": (2400e-3, 2600e-3),
@@ -31,7 +31,7 @@ target: Target = {
 
     "vit_a": (700e-6, None),
     "vit_c": (40e-3, None),
-    "vit_d": (10e-6, None),
+    # "vit_d": (10e-6, None),
     "vit_e": (4e-3, None),
     "vit_k": (75e-6, None),
     "vit_b1": (1e-3, None),
@@ -53,6 +53,8 @@ global_id_blacklist = [
     "8105729", # Bitter gourd (sounds yucky)
     "8168098", # Yoghurt with incorrect vit D
     "8079236", # Cheestrings, incorrect B6
+    "8035841", # Beansprouts, out-of-date price
+    "7377250", # Party pretzels, incorrect sodium
 ]
 
 min_to_use = {
@@ -344,7 +346,10 @@ def main():
 
     problem.set_target(target)
 
-    problem.taxonomy_blacklist = [0]
+    problem.taxonomy_blacklist = [
+        0
+    ]
+
     problem.taxonomy_whitelist = [
         1019184,
         1019250,
@@ -363,7 +368,7 @@ def main():
         1018859,
     ]
 
-    problem.set_bounds("6334094", 2)
+    # problem.set_bounds("6334094", 2)
     problem.reapply_filter()
     print(f"{len(problem.products)} products found")
 

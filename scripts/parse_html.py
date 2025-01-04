@@ -7,6 +7,13 @@ import base64
 import json
 import re
 
+"""
+This parses the HTML in the data JSON files to find the "confirmed" nutrition
+amounts for all of the products.
+
+Warning: this will drop nutrition and productnutrition.
+"""
+
 serving_synonyms = "serving|capsule|tablet|portion|cake|sachet|pastille|pie|softie|gummy|caplet"
 
 float_re = r"\d+(?:(?:\.|,)\d+)?"
@@ -165,6 +172,7 @@ def parse_slash_row_head(row_head: str) -> tuple[str, float] | None:
             return unit, conv
 
 def extract_nutrition(
+        product,
         cols: list[tuple[str, float] | None],
         rows: list[tuple[str, list[str]]]
     ) -> list[tuple[Nutrition, str, float]] | None:
@@ -189,7 +197,11 @@ def extract_nutrition(
         else:
             unit_scale = 1.0
 
-        nutr = Nutrition()
+        nutr = Nutrition(
+            name=product["name"],
+            source="sainsbury's",
+        )
+
         set_any = False
 
         for row_head, row in rows:
@@ -294,7 +306,7 @@ def parse_html(product, html: str) -> list[tuple[Nutrition, str, float]] | None:
             row_name = row_head.get_text(strip=True)
             rows.append((row_name, [ cell.get_text(strip=True) for cell in r.find_all(["td"]) ]))
 
-        if n_res := extract_nutrition(cols, rows):
+        if n_res := extract_nutrition(product, cols, rows):
             results += n_res
 
     return results
@@ -342,11 +354,16 @@ if __name__ == "__main__":
 
                             assert nutr.id is not None
 
-                            session.add(ProductNutrition(
-                                product_id=uid,
-                                nutrition_id=nutr.id,
-                                measure=measure,
-                                amount=amount))
+                            session.add(
+                                ProductNutrition(
+                                    product_id=uid,
+                                    nutrition_id=nutr.id,
+                                    measure=measure,
+                                    amount=amount,
+                                    scale=1.0,
+                                    source="known"
+                                )
+                            )
 
                             session.commit()
 

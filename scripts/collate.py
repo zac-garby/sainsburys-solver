@@ -2,9 +2,16 @@ from pathlib import Path
 from typing import Any, List
 from sqlmodel import Field, SQLModel, Session, create_engine, select
 from src.data import *
-from scrape import filename_safe
+from scripts.scrape import filename_safe
 
 import json
+
+"""
+Creates all of the products in the database, assuming they exist in data/.
+Doesn't add nutrition info, though.
+
+Run with: python3 -m scripts.collate
+"""
 
 engine = get_engine()
 

@@ -7,12 +7,15 @@ from sqlmodel import Field, SQLModel, Session, Relationship, create_engine, sele
 class ProductNutritionBase(SQLModel):
     measure: str
     amount: float
-    source: str = Field(default="sainsburys")
+    source: str
+    scale: float
     sureness: float = Field(default=1.0)
 
 class ProductNutrition(ProductNutritionBase, table=True):
-    product_id: str | None = Field(default=None, foreign_key="product.id", primary_key=True)
-    nutrition_id: int | None = Field(default=None, foreign_key="nutrition.id", primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
+
+    product_id: str | None = Field(default=None, foreign_key="product.id", index=True)
+    nutrition_id: int | None = Field(default=None, foreign_key="nutrition.id", index=True)
 
     product: Optional["Product"] = Relationship(back_populates="nutritions")
     nutrition: Optional["Nutrition"] = Relationship(back_populates="products")
@@ -107,10 +110,13 @@ class NutritionBase(SQLModel):
 
 class Nutrition(NutritionBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
+    name: str
+    source: str
     products: List[ProductNutrition] = Relationship(back_populates="nutrition")
 
 class NutritionResponse(NutritionBase):
-    pass
+    name: str
+    source: str
 
 class ScratchpadItemBase(SQLModel):
     num_units: float
@@ -174,19 +180,22 @@ def get_products(
 # per unit_amount of the product. 0 if not exist
 def get_nutr_val(product: Product, n: str) -> tuple[float, str, float]:
     for pn in sorted(product.nutritions, key=lambda p: p.sureness, reverse=True):
-        if pn.measure != product.unit_measure or pn.sureness < 0.7:
+        if pn.measure != product.unit_measure or pn.sureness < 0.6:
             continue
 
         kvs = pn.nutrition.__dict__
 
-        if kvs[n] is not None:
-            scale = product.unit_amount / pn.amount
+        if kvs[n] is not None and isinstance(kvs[n], float):
+            scale = pn.scale * product.unit_amount / pn.amount
             return (kvs[n] * scale, pn.source, pn.sureness)
 
     return (0.0, "no source", 0.0)
 
 def collate_nutrition(product: Product) -> ProductResponse:
-    collated = NutritionResponse()
+    collated = NutritionResponse(
+        name=product.name,
+        source="total, collated"
+    )
 
     for k in collated.__dict__.keys():
         v, source, sureness = get_nutr_val(product, k)

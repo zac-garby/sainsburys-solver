@@ -1,10 +1,10 @@
-import math
-from sqlmodel import Session, select
+from sqlmodel import Session, delete, select
 from src.data import Nutrition, Product, ProductNutrition, get_engine
 from typing import Any
+from scripts import embedding
 
+import math
 import torch
-import embedding
 
 def normalise_data(row: dict[str, Any], to_kcal: float) -> tuple[dict[str, float], float]:
     kcal = float(row["energy"]) + 1
@@ -38,65 +38,23 @@ def nutrient_similarity(pn: ProductNutrition, row: dict[str, float]) -> tuple[fl
 
             if prod_per_100g < 0.1 and row_per_100g < 0.1:
                 ratios.append(1.0)
-            elif row_per_100g > 0:
-                r = prod_per_100g / row_per_100g
-                if r == 0:
-                    r = math.exp(-prod_per_100g - row_per_100g)
-                else:
-                    r = min(r, 1 / r)
-                ratios.append(r * r)
+            elif row_per_100g > 0 and prod_per_100g > 0:
+                # r = prod_per_100g / row_per_100g
+                # if r == 0:
+                #     r = math.exp(-prod_per_100g - row_per_100g)
+                # else:
+                #     r = min(r, 1 / r)
+                # ratios.append(r * r)
+                d = max(prod_per_100g / row_per_100g, row_per_100g / prod_per_100g)
+                r = math.exp(1.0 - d)
+                ratios.append(r)
+
+            # print(f"     {k}: {prod_per_100g:.2f}/{row_per_100g:.2f} - {ratios[-1]:.2f}")
 
     if len(ratios) <= 2:
         return 0.0, 0.0
 
     return sum(ratios) / len(ratios), scale
-
-def nutr_from(row: dict[str, float], scale: float) -> Nutrition:
-    def _get(k):
-        if k in row and row[k] not in [None, ""] and float(row[k]) > 0:
-            return float(row[k]) * scale
-        else:
-            return None
-
-    nutr = Nutrition(
-        energy=_get("energy"),
-        protein=_get("protein"),
-        fat=_get("fat"),
-        sat_fat=_get("sat_fat"),
-        cholesterol=_get("cholesterol"),
-        carbohydrate=_get("carbohydrate"),
-        total_sugar=_get("total_sugar"),
-        starch=_get("starch"),
-        fibre=_get("fibre"),
-        sodium=_get("sodium"),
-        potassium=_get("potassium"),
-        calcium=_get("calcium"),
-        magnesium=_get("magnesium"),
-        chromium=_get("chromium"),
-        molybdenum=_get("molybdenum"),
-        phosphorus=_get("phosphorus"),
-        iron=_get("iron"),
-        copper=_get("copper"),
-        zinc=_get("zinc"),
-        manganese=_get("manganese"),
-        selenium=_get("selenium"),
-        iodine=_get("iodine"),
-        vit_a=_get("vit_a"),
-        vit_c=_get("vit_c"),
-        vit_d=_get("vit_d"),
-        vit_e=_get("vit_e"),
-        vit_k=_get("vit_k"),
-        vit_b1=_get("vit_b1"),
-        vit_b2=_get("vit_b2"),
-        vit_b3=_get("vit_b3"),
-        vit_b5=_get("vit_b5"),
-        vit_b6=_get("vit_b6"),
-        vit_b7=_get("vit_b7"),
-        vit_b9=_get("vit_b9"),
-        vit_b12=_get("vit_b12")
-    )
-
-    return nutr
 
 def main(session: Session):
     products = session.exec(select(Product).order_by(Product.id))
@@ -109,14 +67,23 @@ def main(session: Session):
     new_pairings = []
 
     for i, product in enumerate(products):
-        if i % 500 == 0 and i > 0:
-            print(f"done {i}")
+        if i % 5000 == 0 and i > 0:
+            print(f"done {i}/{len(sainsbury_embs)}")
+
+        # if product.id != "1191417":
+        #     continue
+
+        # print(f"product: {product.name}")
+
+        if len(product.nutritions) == 0:
+            continue
 
         scores, idxs = torch.topk(similarity[i], k=5)
-        if scores[0] < 0.8:
+        if scores[0] < 0.75:
             continue
 
         for pn in product.nutritions:
+            # print(f" matching on pn for {pn.amount:.2f} {pn.measure}")
             # don't want to compare on micronutrients (yet?)'
             if pn.nutrition is None or pn.nutrition.energy is None:
                 continue
@@ -125,37 +92,40 @@ def main(session: Session):
 
             for score, i in zip(scores, idxs):
                 row = data[i]
-
                 nutr_sim, scale = nutrient_similarity(pn, row)
+                # print(f"  s={score:.2f}, n={nutr_sim:.2f}: {row["name"]}")
+
                 if closest is None or nutr_sim > best_nutr_sim:
                     closest, best_nutr_sim, best_scale = row, nutr_sim, scale
 
             if closest is None or best_nutr_sim < 0.5:
                 continue
 
-            new_nutr = nutr_from(closest, best_scale)
-            new_pairings.append((new_nutr, pn, best_nutr_sim, closest))
+            new_pairings.append((pn, best_nutr_sim, closest, best_scale))
 
     print(f"{len(new_pairings)} new pairings")
+    print("probably you want to make sure any old matches are deleted before continuing!")
+    input("type anything to commit; ctrl+c to exit")
 
-    for new_nutr, _, _, _ in new_pairings:
-        session.add(new_nutr)
-    session.commit()
+    for pn, sureness, row, scale in new_pairings:
+        new_nutr = session.exec(select(Nutrition).where(
+            (Nutrition.name == row["name"]) & (Nutrition.source == row["dataset"])
+        )).first()
 
-    print(f"committed new nutritions")
-
-    for new_nutr, pn, sureness, row in new_pairings:
-        assert new_nutr.id is not None
+        assert new_nutr
 
         new_pn = ProductNutrition(
             amount=pn.amount,
             measure=pn.measure,
             product=pn.product,
             nutrition_id=new_nutr.id,
-            source=f"scraped from {row['name']} ({row['source']})",
+            source=f"matched (sureness {sureness}) from {row["source"]}",
             sureness=sureness,
+            scale=scale,
         )
+
         session.add(new_pn)
+
     session.commit()
 
     print(f"committed new product-nutrition pairs")
