@@ -1,3 +1,4 @@
+import re
 from typing import List, Optional
 from pydantic import BaseModel
 from sqlalchemy import Engine, Result, Sequence
@@ -179,6 +180,12 @@ def get_products(
 # gets the nutrient value of a given nutrient n
 # per unit_amount of the product. 0 if not exist
 def get_nutr_val(product: Product, n: str) -> tuple[float, str, float]:
+    if m := re.match(r"taxon:(\d+)", n):
+        # a taxon requirement, rather than a nutrient
+        taxon = int(m.group(1))
+        amount = 1.0 if any(t.id == taxon for t in product.taxonomies) else 0.0
+        return (amount * product.unit_amount, "taxonomy", 0.0)
+
     for pn in sorted(product.nutritions, key=lambda p: p.sureness, reverse=True):
         if pn.measure != product.unit_measure or pn.sureness < 0.7:
             continue

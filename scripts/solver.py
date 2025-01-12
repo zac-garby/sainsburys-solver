@@ -12,10 +12,11 @@ import numpy as np
 Target = dict[str, tuple[float | None, float | None]]
 
 target: Target = {
-    "protein": (85, None),
-    "fat": (50, 75),
-    "sat_fat": (None, 15),
-    "carbohydrate": (280, 350),
+    "energy": (2100, 2300),
+    # "protein": (85, None),
+    # "fat": (50, 75),
+    # "sat_fat": (None, 15),
+    # "carbohydrate": (280, 350),
     # "total_sugar": (150, None),
     "fibre": (30, None),
     "sodium": (2400e-3, 3600e-3),
@@ -48,6 +49,53 @@ target: Target = {
     "vit_b12": (15e-6, None),
 }
 
+target: Target = {
+    "energy": (2100, 2300),
+    "protein": (85, None),
+    "fat": (50, None),
+    "sat_fat": (None, 15),
+    "carbohydrate": (280, None),
+    "total_sugar": (None, 35),
+    "fibre": (30, None),
+    "sodium": (2400e-3, 3600e-3),
+
+    "potassium": (3500e-3, None),
+    "calcium": (1000e-3, None),
+    "magnesium": (350e-3, None),
+    # "chromium": (0, None),
+    # "molybdenum": (0, None),
+    "phosphorus": (550e-3, None),
+    "iron": (8.7e-3, None),
+    "copper": (1.4e-3, None),
+    "zinc": (9.5e-3, None),
+    # "manganese": (0e-3, None),
+    "selenium": (75e-6, None),
+    "iodine": (140e-6, None),
+
+    "vit_a": (700e-6, None),
+    "vit_c": (40e-3, None),
+    "vit_d": (10e-6, None),
+    "vit_e": (4e-3, None),
+    "vit_k": (75e-6, None),
+    "vit_b1": (1e-3, None),
+    "vit_b2": (1.3e-3, None),
+    "vit_b3": (16.5e-3, None),
+    "vit_b5": (5e-3, None),
+    "vit_b6": (1.4e-3, None),
+    # "vit_b7": (0e-6, None),
+    "vit_b9": (400e-6, None),
+    "vit_b12": (15e-6, None),
+
+    # at least 500g of fruit & veg
+    "taxon:1020082": (750, None),
+
+    # at most 200g of bread
+    "taxon:1018785": (None, 200),
+
+    # at most 50g of "home baking"
+    "taxon:1019837": (None, 50),
+}
+
 global_id_blacklist = [
     "8092711", # Wrong price (beef)
     "6567540", # Wrong price (noodles)
@@ -64,15 +112,15 @@ global_id_blacklist = [
 ]
 
 min_to_use = {
-    "g": 5,
-    "ml": 5,
-    "serving": 1.0,
+    "g": 50,
+    "ml": 50,
+    "serving": 0.5,
 }
 
 max_to_use = {
-    "g": 1000,
-    "ml": 1000,
-    "serving": 10,
+    "g": 500,
+    "ml": 500,
+    "serving": 5,
 }
 
 @dataclass
@@ -112,6 +160,10 @@ class Solution:
 
     def print_nutrition(self):
         for k in self.target.keys():
+            if k == "energy":
+                # this gets printed at the end, anyway
+                continue
+
             val = self.total_nutrients[k]
             disp = show_g(val)
 
@@ -138,9 +190,9 @@ class Solution:
         print(f"  total:   £{self.total_price:.2f}")
 
 def show_g(val: float) -> str:
-    if val <= 1e-3:
+    if val < 1e-3:
         disp = f"{val * 1e+6:.2f}µg"
-    elif val <= 1:
+    elif val < 1:
         disp = f"{val * 1e+3:.2f}mg"
     elif val <= 500:
         disp = f"{val:.2f}g"
@@ -267,12 +319,13 @@ class Problem:
 
         bounds = []
         for prod, (mn, mx) in zip(self.products, self.bounds):
-            if prod.unit_measure == "serving":
-                min_amount = 0.5 / prod.unit_amount
-            else:
-                min_amount = 50 / prod.unit_amount
+            min_amount = min_to_use[prod.unit_measure] / prod.unit_amount
+            max_amount = max_to_use[prod.unit_measure] / prod.unit_amount
 
-            bounds.append((max(mn or min_amount, min_amount), mx))
+            bounds.append((
+                max(mn or min_amount, min_amount),
+                min(mx or max_amount, max_amount)
+            ))
 
         result = linprog(
             c=self.prices,
@@ -395,7 +448,7 @@ def main():
           1019744, # Fruit & desserts
           1019754, # Jams, honey & spreads
           1019794, # Rice, pasta & noodles
-          1019837, # Sugar & home baking
+          # 1019837, # Sugar & home baking
           1019850, # Table sauces etc
           1019869, # Tea, coffee & hot drinks
         # Frozen
