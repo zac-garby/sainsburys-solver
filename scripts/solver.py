@@ -1,20 +1,24 @@
 from dataclasses import dataclass
-from scipy.optimize import linprog
+from typing import Tuple
+from scipy.optimize import linprog, differential_evolution, minimize
+from mealpy import GA, PSO, SMA, FloatVar, SHADE, IntegerVar
 from ortools.linear_solver import pywraplp
 from src.data import *
 
 import pulp
+import mealpy
+import numpy as np
 
 Target = dict[str, tuple[float | None, float | None]]
 
 target: Target = {
-    "protein": (130, 140),
-    "fat": (50, 65),
+    "protein": (85, None),
+    "fat": (50, 75),
     "sat_fat": (None, 15),
-    "carbohydrate": (180, 220),
-    "total_sugar": (None, 10),
-    "fibre": (40, None),
-    "sodium": (2400e-3, 2600e-3),
+    "carbohydrate": (280, 350),
+    # "total_sugar": (150, None),
+    "fibre": (30, None),
+    "sodium": (2400e-3, 3600e-3),
 
     "potassium": (3500e-3, None),
     "calcium": (1000e-3, None),
@@ -31,7 +35,7 @@ target: Target = {
 
     "vit_a": (700e-6, None),
     "vit_c": (40e-3, None),
-    # "vit_d": (10e-6, None),
+    "vit_d": (10e-6, None),
     "vit_e": (4e-3, None),
     "vit_k": (75e-6, None),
     "vit_b1": (1e-3, None),
@@ -55,6 +59,8 @@ global_id_blacklist = [
     "8079236", # Cheestrings, incorrect B6
     "8035841", # Beansprouts, out-of-date price
     "7377250", # Party pretzels, incorrect sodium
+    "7518068", # Lime leaves, incorrect amount
+    "7518051", # Bay leaves, incorrect mapping
 ]
 
 min_to_use = {
@@ -259,12 +265,22 @@ class Problem:
         if len(self.products) == 0:
             return None
 
+        bounds = []
+        for prod, (mn, mx) in zip(self.products, self.bounds):
+            if prod.unit_measure == "serving":
+                min_amount = 0.5 / prod.unit_amount
+            else:
+                min_amount = 50 / prod.unit_amount
+
+            bounds.append((max(mn or min_amount, min_amount), mx))
+
         result = linprog(
             c=self.prices,
             A_ub=self.nutrient_amounts,
             b_ub=self.goals,
-            bounds=self.bounds,
-            method="highs"
+            bounds=bounds,
+            method="highs",
+            integrality=2, # semi-continuous
         )
 
         if not result.success:
@@ -351,21 +367,51 @@ def main():
     ]
 
     problem.taxonomy_whitelist = [
-        1019184,
-        1019250,
-        1019895,
-        1019902,
-        1019909,
-        1019924,
-        1019934,
-        1019943,
-        1019988,
-        1019999,
-        1019883,
-        1020082,
-        1020363,
-        1020378,
-        1018859,
+        1018859, # Bakery
+        # Dairy, eggs & chilled
+          1019075, # Dairy & eggs
+          1019084, # Desserts
+          1019106, # Fruit juice & drinks
+          1019176, # Vegetarian, vegan & dairy free (chilled)
+        1019463, # Drinks
+        # Food cupboard
+          1019495, # Biscuits & crackers
+          # Canned ...
+            1019496, # Baked beans & canned pasta
+            1019510, # Canned fish
+            1019511, # Canned fruit
+            1019514, # Olives & antipasti
+            1019515, # Pickled food
+            1019516, # Pulses & beans
+            1019528, # Soups
+            1019530, # Tomatoes
+            1019538, # Vegetables
+            1019539, # Vegetarian
+          1019573, # Cereals
+          1019598, # Confectionary
+          1019630, # Cooking ingredients & oils
+          1019666, # Cooking sauces & meal kits
+          1019694, # Crisps, nuts & snacking fruit
+          1019744, # Fruit & desserts
+          1019754, # Jams, honey & spreads
+          1019794, # Rice, pasta & noodles
+          1019837, # Sugar & home baking
+          1019850, # Table sauces etc
+          1019869, # Tea, coffee & hot drinks
+        # Frozen
+          1019895, # Chips, potatoes & rice
+          1019902, # Desserts & pastry
+          1019924, # Fish & seafood
+          1019934, # Fruit, veg & herbs
+          1019943, # Ice cream & ice
+          1019974, # Pizza & garlic bread
+          1019988, # Vegan
+          1019999, # Vegetarian & meat free
+          1020000, # Yorkshires & roast accompaniments
+        1020082, # Fruit & veg
+        # Meat & fish
+          1020363, # Fish & seafood
+          1020378, # Meat free
     ]
 
     # problem.set_bounds("6334094", 2)

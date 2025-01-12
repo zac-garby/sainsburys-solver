@@ -180,7 +180,7 @@ def get_products(
 # per unit_amount of the product. 0 if not exist
 def get_nutr_val(product: Product, n: str) -> tuple[float, str, float]:
     for pn in sorted(product.nutritions, key=lambda p: p.sureness, reverse=True):
-        if pn.measure != product.unit_measure or pn.sureness < 0.6:
+        if pn.measure != product.unit_measure or pn.sureness < 0.7:
             continue
 
         kvs = pn.nutrition.__dict__
