@@ -31,6 +31,8 @@ def nutr_from(row: dict[str, Any]) -> Nutrition:
         protein=_get("protein"),
         fat=_get("fat"),
         sat_fat=_get("sat_fat"),
+        omega_3=_get("omega_3"),
+        omega_6=_get("omega_6"),
         cholesterol=_get("cholesterol"),
         carbohydrate=_get("carbohydrate"),
         total_sugar=_get("total_sugar"),

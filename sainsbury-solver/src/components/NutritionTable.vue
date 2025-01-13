@@ -6,6 +6,8 @@ const nutrKeys = [
     "protein",
     "fat",
     "sat_fat",
+    "omega_3",
+    "omega_6",
     "cholesterol",
     "carbohydrate",
     "total_sugar",

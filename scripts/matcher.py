@@ -33,7 +33,7 @@ def nutrient_similarity(pn: ProductNutrition, row: dict[str, float]) -> tuple[fl
     nutr = pn.nutrition.__dict__
 
     for k, row_per_100g in norm.items():
-        if nutr[k] is not None:
+        if k in nutr and nutr[k] is not None:
             prod_per_100g = nutr[k]
 
             if prod_per_100g < 0.1 and row_per_100g < 0.1:
@@ -61,6 +61,7 @@ def main(session: Session):
     sainsbury_embs, data, data_embs = embedding.load_data()
 
     print(f"matching {len(sainsbury_embs)} products against {len(data_embs)} generic items")
+    print(f"sainsbury_embs: {sainsbury_embs.shape} vs data_embs: {data_embs.shape}")
 
     similarity = embedding.model.similarity(sainsbury_embs, data_embs)
 
@@ -88,20 +89,32 @@ def main(session: Session):
             if pn.nutrition is None or pn.nutrition.energy is None:
                 continue
 
-            closest, best_nutr_sim, best_scale = None, 0.0, 0.0
+            options = []
 
             for score, i in zip(scores, idxs):
                 row = data[i]
                 nutr_sim, scale = nutrient_similarity(pn, row)
-                # print(f"  s={score:.2f}, n={nutr_sim:.2f}: {row["name"]}")
+                options.append((row, nutr_sim, scale))
 
-                if closest is None or nutr_sim > best_nutr_sim:
-                    closest, best_nutr_sim, best_scale = row, nutr_sim, scale
+                # if closest is None or nutr_sim > best_nutr_sim:
+                #     closest, best_nutr_sim, best_scale = row, nutr_sim, scale
 
-            if closest is None or best_nutr_sim < 0.5:
+            # options[0] is the best
+            options.sort(key=lambda p: p[1], reverse=True)
+
+            if len(options) == 0 or options[0][1] < 0.7:
                 continue
 
-            new_pairings.append((pn, best_nutr_sim, closest, best_scale))
+            sources_seen = set()
+            for row, nutr_sim, scale in options:
+                if row["source"] in sources_seen:
+                    continue
+
+                if nutr_sim < 0.7:
+                    break
+
+                new_pairings.append((pn, nutr_sim, row, scale))
+                sources_seen.add(row["source"])
 
     print(f"{len(new_pairings)} new pairings")
     print("probably you want to make sure any old matches are deleted before continuing!")

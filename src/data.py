@@ -77,6 +77,8 @@ class NutritionBase(SQLModel):
     protein: float | None = Field(default=None)
     fat: float | None = Field(default=None)
     sat_fat: float | None = Field(default=None)
+    omega_3: float | None = Field(default=None)
+    omega_6: float | None = Field(default=None)
     cholesterol: float | None = Field(default=None)
     carbohydrate: float | None = Field(default=None)
     total_sugar: float | None = Field(default=None)
